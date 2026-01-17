@@ -43,10 +43,9 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
-# Environment files with sensitive data
+# Add this line to BIW/.gitignore
 src/environments/environment.ts
-src/environments/environment.development.ts
 src/environments/environment.prod.ts
 
 # Keep the template
-! src/environments/environment.template. ts
+! src/environments/environment.template.ts
