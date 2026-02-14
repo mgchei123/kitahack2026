@@ -141,12 +141,21 @@ export class App implements OnInit {
   receipts: any[] = [];
   loadingReceipts = false;
 
-  constructor(
-    private gemini: GeminiService,
-    private supabase: SupabaseService,
-    private receiptService: ReceiptService,
-    private mealService: MealService
-  ) {}
+constructor(
+  private gemini: GeminiService,
+  private supabase: SupabaseService,
+  private receiptService: ReceiptService,
+  private mealService: MealService
+) {
+  // 🔧 EXPOSE TO CONSOLE FOR TESTING
+  (window as any).backend = {
+    gemini: this.gemini,
+    supabase: this.supabase,
+    receipt: this.receiptService,
+    meal: this.mealService
+  };
+  console.log('✅ Access backend services via: window.backend');
+}
 
   ngOnInit() {
   // Listen for auth state changes
