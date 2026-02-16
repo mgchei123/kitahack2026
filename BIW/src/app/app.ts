@@ -1,16 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms'; // ← ADD THIS for ngModel
+import { FormsModule } from '@angular/forms'; 
 import { GeminiService } from './services/gemini';
 import { SupabaseService } from './services/supabase.service';
 import { ReceiptService } from './services/receipt.service';
 import { MealService } from './services/meal.service';
-import { AuthService } from './services/auth.service'; // ← ADD THIS
+import { AuthService } from './services/auth.service'; 
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule], // ← ADD FormsModule
+  imports: [CommonModule, FormsModule], 
   template: `
     <div style="padding: 20px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">
       <h1>🚀 Supabase + Gemini Dashboard</h1>
@@ -202,14 +202,14 @@ export class App implements OnInit {
     private supabase: SupabaseService,
     private receiptService: ReceiptService,
     private mealService: MealService,
-    private auth: AuthService // ← ADD THIS
+    private auth: AuthService
   ) {
     (window as any).backend = {
       gemini: this.gemini,
       supabase: this.supabase,
       receipt: this.receiptService,
       meal: this.mealService,
-      auth: this.auth // ← ADD THIS
+      auth: this.auth 
     };
     console.log('✅ Access backend services via: window.backend');
   }
