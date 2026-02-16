@@ -6,6 +6,8 @@ import { SupabaseService } from './services/supabase.service';
 import { ReceiptService } from './services/receipt.service';
 import { MealService } from './services/meal.service';
 import { AuthService } from './services/auth.service'; 
+import { ReceiptProcessorService } from './services/receipt-processor.service';
+import { InventoryService } from './services/inventory.service';
 
 @Component({
   selector: 'app-root',
@@ -131,6 +133,14 @@ import { AuthService } from './services/auth.service';
           {{ uploadLoading ? '⏳ Uploading...' : '📤 Upload Test Receipt' }}
         </button>
         
+        <button 
+          (click)="testFullPipeline()" 
+          [disabled]="!selectedFile || !isAuthenticated || uploadLoading"
+          style="margin-left: 10px; padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer;"
+          [style.opacity]="(!selectedFile || !isAuthenticated) ? '0.5' : '1'">
+          {{ uploadLoading ? '⏳ Processing...' : '🚀 Test Full Pipeline' }}
+        </button>
+
         <div style="margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
           {{ uploadStatus }}
         </div>
@@ -202,14 +212,18 @@ export class App implements OnInit {
     private supabase: SupabaseService,
     private receiptService: ReceiptService,
     private mealService: MealService,
-    private auth: AuthService
+    private auth: AuthService,
+    private receiptProcessor: ReceiptProcessorService,  
+    private inventory: InventoryService  
   ) {
     (window as any).backend = {
       gemini: this.gemini,
       supabase: this.supabase,
       receipt: this.receiptService,
       meal: this.mealService,
-      auth: this.auth 
+      auth: this.auth,
+      processor: this.receiptProcessor,  // ADD THIS
+      inventory: this.inventory  // ADD THIS
     };
     console.log('✅ Access backend services via: window.backend');
   }
@@ -417,5 +431,32 @@ export class App implements OnInit {
     } finally {
       this.loadingReceipts = false;
     }
+  }
+  async testFullPipeline() {
+  if (!this.selectedFile) {
+    alert('Please select a receipt image first');
+    return;
+  }
+
+  this.uploadLoading = true;
+  this.uploadStatus = '⏳ Processing receipt (Mock AI)...';
+
+  try {
+    const receiptId = await this.receiptProcessor.processReceiptFull(this.selectedFile);
+    this.uploadStatus = `✅ Success! Receipt ID: ${receiptId}\nCheck console for details.`;
+    
+    // Reload receipts to show new one
+    await this.loadReceipts();
+    
+    // Show inventory count
+    const inventory = await this.inventory.getAvailableIngredients();
+    console.log('📦 Current inventory:', inventory);
+    alert(`✅ Processing complete!\n${inventory.length} ingredients in inventory`);
+  } catch (error: any) {
+    this.uploadStatus = `❌ Error: ${error.message}`;
+    console.error('Full pipeline error:', error);
+  } finally {
+    this.uploadLoading = false;
+  }
   }
 }
