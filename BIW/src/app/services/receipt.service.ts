@@ -20,6 +20,13 @@ export interface Receipt {
   items: ReceiptItem[];
   processed: boolean;
   created_at?: string;
+  // New fields from updated schema
+  items_raw?: any[];
+  cookable_items?: any[];
+  non_cookable_items?: any[];
+  processing_status?: 'pending' | 'processing' | 'completed' | 'failed';
+  error_message?: string;
+  updated_at?: string;
 }
 
 @Injectable({
@@ -101,8 +108,9 @@ export class ReceiptService {
         purchase_date: receiptData.purchase_date || new Date().toISOString(),
         total_amount: receiptData.total_amount || 0,
         items: receiptData.items || [],
-        currency: receiptData.currency || 'USD',
-        processed: false
+        currency: receiptData.currency || 'MYR',
+        processed: false,
+        processing_status: 'pending'  // Set initial status
       };
 
       const receiptId = await this.saveReceipt(receipt);
@@ -158,6 +166,28 @@ export class ReceiptService {
   }
 
   /**
+   * Get unprocessed receipts (for AI processing queue)
+   */
+  async getUnprocessedReceipts(limit: number = 10): Promise<Receipt[]> {
+    try {
+      const { data, error } = await this.supabase.client
+        .from('receipts')
+        .select('*')
+        .eq('processed', false)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      
+      console.log(`✅ Found ${data.length} unprocessed receipts`);
+      return data as Receipt[];
+    } catch (error) {
+      console.error('❌ Error fetching unprocessed receipts:', error);
+      return [];
+    }
+  }
+
+  /**
    * Update receipt (e.g., after AI processing)
    */
   async updateReceipt(receiptId: string, updates: Partial<Receipt>): Promise<void> {
@@ -172,6 +202,67 @@ export class ReceiptService {
     } catch (error) {
       console.error('❌ Error updating receipt:', error);
       throw new Error('Failed to update receipt');
+    }
+  }
+
+  /**
+   * Update receipt processing status
+   */
+  async updateReceiptStatus(
+    receiptId: string, 
+    status: 'pending' | 'processing' | 'completed' | 'failed',
+    errorMessage?: string
+  ): Promise<void> {
+    try {
+      const updateData: any = { 
+        processing_status: status,
+        updated_at: new Date().toISOString()
+      };
+      
+      if (errorMessage) {
+        updateData.error_message = errorMessage;
+      }
+
+      const { error } = await this.supabase.client
+        .from('receipts')
+        .update(updateData)
+        .eq('id', receiptId);
+
+      if (error) throw error;
+      console.log(`✅ Receipt ${receiptId} status: ${status}`);
+    } catch (error) {
+      console.error('❌ Error updating receipt status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save AI processing results
+   */
+  async saveAIProcessingResults(
+    receiptId: string,
+    itemsRaw: any[],
+    cookableItems: any[],
+    nonCookableItems: any[]
+  ): Promise<void> {
+    try {
+      const { error } = await this.supabase.client
+        .from('receipts')
+        .update({
+          items_raw: itemsRaw,
+          cookable_items: cookableItems,
+          non_cookable_items: nonCookableItems,
+          processing_status: 'completed',
+          processed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', receiptId);
+
+      if (error) throw error;
+      console.log('✅ AI processing results saved');
+    } catch (error) {
+      console.error('❌ Error saving AI results:', error);
+      throw error;
     }
   }
 
@@ -203,26 +294,6 @@ export class ReceiptService {
     } catch (error) {
       console.error('❌ Error deleting receipt:', error);
       throw new Error('Failed to delete receipt');
-    }
-  }
-
-  /**
-   * Get unprocessed receipts (for AI processing)
-   */
-  async getUnprocessedReceipts(limit: number = 10): Promise<Receipt[]> {
-    try {
-      const { data, error } = await this.supabase.client
-        .from('receipts')
-        .select('*')
-        .eq('processed', false)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data as Receipt[];
-    } catch (error) {
-      console.error('❌ Error fetching unprocessed receipts:', error);
-      return [];
     }
   }
 }
