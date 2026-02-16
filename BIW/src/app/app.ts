@@ -1,14 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms'; // ← ADD THIS for ngModel
 import { GeminiService } from './services/gemini';
 import { SupabaseService } from './services/supabase.service';
 import { ReceiptService } from './services/receipt.service';
 import { MealService } from './services/meal.service';
+import { AuthService } from './services/auth.service'; // ← ADD THIS
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule], // ← ADD FormsModule
   template: `
     <div style="padding: 20px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">
       <h1>🚀 Supabase + Gemini Dashboard</h1>
@@ -16,13 +18,60 @@ import { MealService } from './services/meal.service';
       <!-- Auth Status -->
       <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 4px;">
         <strong>Auth Status:</strong> {{ authStatus }}
+        
         @if (!isAuthenticated) {
-          <button (click)="signIn()" style="margin-left: 10px; padding: 5px 10px; cursor: pointer;">
-            Sign In Anonymously
-          </button>
+          <div style="margin-top: 10px;">
+            <!-- Quick Demo Button -->
+            <button (click)="signInAnonymously()" 
+                    style="padding: 8px 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 4px; margin-right: 10px;">
+              🚀 Quick Demo (No Login)
+            </button>
+            
+            <!-- Email Login Toggle -->
+            <button (click)="showEmailAuth = !showEmailAuth" 
+                    style="padding: 8px 16px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 4px;">
+              {{ showEmailAuth ? '❌ Hide Email Login' : '📧 Email Login' }}
+            </button>
+          </div>
+          
+          <!-- Email Auth Form -->
+          @if (showEmailAuth) {
+            <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 4px; border: 1px solid #ddd;">
+              <div style="margin-bottom: 10px;">
+                <input 
+                  type="email" 
+                  [(ngModel)]="email" 
+                  placeholder="Email"
+                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+              </div>
+              <div style="margin-bottom: 10px;">
+                <input 
+                  type="password" 
+                  [(ngModel)]="password" 
+                  placeholder="Password (min 6 characters)"
+                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+              </div>
+              <div>
+                <button (click)="signInWithEmail()" 
+                        [disabled]="authLoading"
+                        style="padding: 8px 16px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                  {{ authLoading ? '⏳ Signing In...' : '🔑 Sign In' }}
+                </button>
+                <button (click)="signUpWithEmail()" 
+                        [disabled]="authLoading"
+                        style="padding: 8px 16px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                  {{ authLoading ? '⏳ Creating Account...' : '✨ Create Account' }}
+                </button>
+              </div>
+              @if (authError) {
+                <p style="color: #ef4444; margin-top: 10px; font-size: 14px;">{{ authError }}</p>
+              }
+            </div>
+          }
         } @else {
-          <button (click)="signOut()" style="margin-left: 10px; padding: 5px 10px; cursor: pointer; background: #ef4444; color: white; border: none; border-radius: 4px;">
-            Sign Out
+          <button (click)="signOut()" 
+                  style="margin-left: 10px; padding: 8px 16px; cursor: pointer; background: #ef4444; color: white; border: none; border-radius: 4px;">
+            🚪 Sign Out
           </button>
         }
       </div>
@@ -128,6 +177,13 @@ export class App implements OnInit {
   authStatus = 'Not authenticated';
   isAuthenticated = false;
   
+  // Email auth form
+  showEmailAuth = false;
+  email = '';
+  password = '';
+  authLoading = false;
+  authError = '';
+  
   aiLoading = false;
   aiResponse = 'Click the button to test AI!';
   
@@ -141,60 +197,119 @@ export class App implements OnInit {
   receipts: any[] = [];
   loadingReceipts = false;
 
-constructor(
-  private gemini: GeminiService,
-  private supabase: SupabaseService,
-  private receiptService: ReceiptService,
-  private mealService: MealService
-) {
-  // 🔧 EXPOSE TO CONSOLE FOR TESTING
-  (window as any).backend = {
-    gemini: this.gemini,
-    supabase: this.supabase,
-    receipt: this.receiptService,
-    meal: this.mealService
-  };
-  console.log('✅ Access backend services via: window.backend');
-}
+  constructor(
+    private gemini: GeminiService,
+    private supabase: SupabaseService,
+    private receiptService: ReceiptService,
+    private mealService: MealService,
+    private auth: AuthService // ← ADD THIS
+  ) {
+    (window as any).backend = {
+      gemini: this.gemini,
+      supabase: this.supabase,
+      receipt: this.receiptService,
+      meal: this.mealService,
+      auth: this.auth // ← ADD THIS
+    };
+    console.log('✅ Access backend services via: window.backend');
+  }
 
   ngOnInit() {
-  // Listen for auth state changes
-  this.supabase.user$.subscribe((user: any) => {  // ← Add explicit type
-    if (user) {
-      this.authStatus = `✅ Authenticated as ${user.id.substring(0, 8)}...`;
-      this.isAuthenticated = true;
-    } else {
-      this.authStatus = '❌ Not authenticated';
-      this.isAuthenticated = false;
-      this.receipts = []; // Clear receipts on sign out
-    }
-  });
-}
-
-  async signIn() {
-    try {
-      this.authStatus = '⏳ Signing in...';
-      const user = await this.supabase.signInAnonymously();
+    this.supabase.user$.subscribe((user: any) => {
       if (user) {
-        this.authStatus = `✅ Signed in as ${user.id.substring(0, 8)}...`;
+        this.authStatus = `✅ Authenticated as ${user.email || user.id.substring(0, 8) + '...'}`;
         this.isAuthenticated = true;
       } else {
-        this.authStatus = '❌ Sign in failed';
+        this.authStatus = '❌ Not authenticated';
+        this.isAuthenticated = false;
+        this.receipts = [];
+      }
+    });
+  }
+
+  // 🚀 Anonymous Sign In
+  async signInAnonymously() {
+    try {
+      this.authStatus = '⏳ Signing in anonymously...';
+      const user = await this.auth.signInAnonymously();
+      if (user) {
+        this.authStatus = `✅ Signed in anonymously as ${user.id.substring(0, 8)}...`;
+        this.isAuthenticated = true;
+      } else {
+        this.authStatus = '❌ Anonymous sign in failed';
       }
     } catch (error: any) {
       this.authStatus = `❌ Error: ${error.message}`;
-      console.error('Sign in error:', error);
+      console.error('Anonymous sign in error:', error);
     }
   }
 
+  // 📧 Email Sign In
+  async signInWithEmail() {
+    if (!this.email || !this.password) {
+      this.authError = 'Please enter email and password';
+      return;
+    }
+
+    this.authLoading = true;
+    this.authError = '';
+    
+    try {
+      const user = await this.auth.signInWithEmail(this.email, this.password);
+      if (user) {
+        this.authStatus = `✅ Signed in as ${user.email}`;
+        this.isAuthenticated = true;
+        this.showEmailAuth = false;
+        this.email = '';
+        this.password = '';
+      }
+    } catch (error: any) {
+      this.authError = error.message || 'Failed to sign in';
+    } finally {
+      this.authLoading = false;
+    }
+  }
+
+  // ✨ Email Sign Up
+  async signUpWithEmail() {
+    if (!this.email || !this.password) {
+      this.authError = 'Please enter email and password';
+      return;
+    }
+
+    if (this.password.length < 6) {
+      this.authError = 'Password must be at least 6 characters';
+      return;
+    }
+
+    this.authLoading = true;
+    this.authError = '';
+    
+    try {
+      const user = await this.auth.signUp(this.email, this.password);
+      if (user) {
+        this.authStatus = `✅ Account created! Check your email to verify.`;
+        this.authError = '📧 Please check your email to verify your account';
+      }
+    } catch (error: any) {
+      this.authError = error.message || 'Failed to create account';
+    } finally {
+      this.authLoading = false;
+    }
+  }
+
+  // 🚪 Sign Out
   async signOut() {
     try {
-      await this.supabase.signOut();
+      await this.auth.signOut();
       this.authStatus = '✅ Signed out successfully';
       this.isAuthenticated = false;
       this.receipts = [];
       this.selectedFile = null;
       this.uploadStatus = 'No file selected';
+      this.showEmailAuth = false;
+      this.email = '';
+      this.password = '';
     } catch (error: any) {
       console.error('Sign out error:', error);
     }
@@ -239,14 +354,12 @@ constructor(
   onFileSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         this.uploadStatus = '❌ Please select an image file';
         this.selectedFile = null;
         return;
       }
       
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         this.uploadStatus = '❌ File too large (max 5MB)';
         this.selectedFile = null;
@@ -282,11 +395,7 @@ constructor(
       );
       
       this.uploadStatus = `✅ Success! Receipt ID: ${result.receiptId}`;
-      
-      // Auto-reload receipts after upload
       setTimeout(() => this.loadReceipts(), 500);
-      
-      // Clear file input
       this.selectedFile = null;
     } catch (error: any) {
       this.uploadStatus = `❌ Error: ${error.message}`;
