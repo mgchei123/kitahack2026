@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { GeminiService } from './gemini';
 import { ReceiptService } from './receipt.service';
 import { InventoryService } from './inventory.service';
+import { OcrService } from './ocr.service';
 
 @Injectable({
   providedIn: 'root'
@@ -9,12 +10,13 @@ import { InventoryService } from './inventory.service';
 export class ReceiptProcessorService {
   
   // ⚙️ CONFIGURATION - Change this to switch between mock and real AI
-  private USE_MOCK_DATA = true; // Set to FALSE when AI Engineer's endpoints are ready
+  private USE_MOCK_DATA = false; // Set to FALSE to use real OCR
   
   constructor(
     private gemini: GeminiService,
     private receiptService: ReceiptService,
-    private inventoryService: InventoryService
+    private inventoryService: InventoryService,
+    private ocr: OcrService
   ) {}
 
   /**
@@ -33,11 +35,20 @@ export class ReceiptProcessorService {
 
       // Step 2: Extract text with OCR
       console.log('🔍 Step 2: Extracting text from receipt...');
-      const ocrText = await this.callOCRService(imageUrl);
+      const ocrResult = await this.callOCRService(imageUrl);
+      
+      // Step 2b: Save OCR result to database
+      console.log('💾 Step 2b: Saving OCR result...');
+      await this.receiptService.saveOCRResult(
+        receiptId,
+        ocrResult.raw_text,
+        ocrResult.confidence,
+        'gemini-2.5-flash'
+      );
       
       // Step 3: Parse receipt data
       console.log('🤖 Step 3: Parsing receipt data...');
-      const parsedData = await this.parseReceiptWithAI(ocrText);
+      const parsedData = await this.parseReceiptWithAI(ocrResult.raw_text);
       console.log('✅ Parsed data:', parsedData);
 
       // Step 4: Classify items
@@ -80,39 +91,40 @@ export class ReceiptProcessorService {
   }
 
   /**
-   * Call OCR service
-   * 🔄 CHANGE THIS: When AI Engineer provides OCR endpoint, update the real implementation
+   * Call OCR service - NOW USING REAL SUPABASE EDGE FUNCTION
    */
-  private async callOCRService(imageUrl: string): Promise<string> {
+  private async callOCRService(imageUrl: string): Promise<{ raw_text: string; confidence: number }> {
     if (this.USE_MOCK_DATA) {
-      // MOCK DATA - Using hardcoded receipt text
       console.log('🎭 Using MOCK OCR');
       await this.delay(500);
-      return this.getMockReceiptText();
+      return {
+        raw_text: this.getMockReceiptText(),
+        confidence: 0.95
+      };
     }
     
-    // 🔄 REAL IMPLEMENTATION - Uncomment and update when AI Engineer provides endpoint
-    /*
     try {
-      const response = await fetch('YOUR_AI_ENGINEER_OCR_ENDPOINT', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: imageUrl })
+      // Validate image URL is accessible
+      const isValid = await this.ocr.validateImageUrl(imageUrl);
+      if (!isValid) {
+        throw new Error('Receipt image URL is not accessible');
+      }
+
+      // Call the deployed OCR Edge Function
+      console.log('🔍 Calling deployed OCR Edge Function...');
+      const result = await this.ocr.extractTextFromImage(imageUrl);
+      
+      console.log('✅ OCR completed:', {
+        textLength: result.raw_text.length,
+        confidence: result.confidence
       });
+
+      return result;
       
-      if (!response.ok) throw new Error('OCR API failed');
-      
-      const data = await response.json();
-      return data.raw_text;
-    } catch (error) {
-      console.error('OCR API error:', error);
-      throw new Error('Failed to extract text from receipt');
+    } catch (error: any) {
+      console.error('❌ OCR Service Error:', error);
+      throw new Error(`OCR failed: ${error.message}`);
     }
-    */
-    
-    // Fallback to Gemini (temporary)
-    const prompt = `Extract ALL text from this receipt image. Return the raw text exactly as it appears.`;
-    return await this.gemini.generateText(prompt);
   }
 
   /**
