@@ -82,7 +82,7 @@ serve(async (req) => {
 
     // ✅ Get Gemini API credentials
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash-exp'
+    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
 
     if (!GEMINI_API_KEY) {
       console.error('❌ GEMINI_API_KEY not configured')
