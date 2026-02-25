@@ -20,53 +20,43 @@ class _ScannerScreenState extends State<ScannerScreen> {
     setState(() => _isProcessing = true);
     
     try {
-      // 1. Pick an image (Opens file picker on Web, Camera on Mobile)
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
-      
-      if (image == null) {
-        setState(() => _isProcessing = false);
-        return; // User canceled the picker
-      }
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+    if (image == null) return;
 
-      // 2. Prepare for upload (Convert to bytes for Web compatibility)
-      final Uint8List imageBytes = await image.readAsBytes();
-      final String userId = supabase.auth.currentUser!.id;
-      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      
-      // Define the storage path based on the Guide
-      final String storagePath = 'receipts/$userId/$timestamp.jpg';
+    // Naming Policy: ${userId}/${timestamp}.jpg
+    final String userId = supabase.auth.currentUser!.id;
+    final String path = 'receipts/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      // 3. Upload to Supabase 'receipts' bucket
-      await supabase.storage.from('receipts').uploadBinary(
-        storagePath,
-        imageBytes,
-        fileOptions: const FileOptions(contentType: 'image/jpeg'),
-      );
+    // 1. Upload to Storage
+    // Note: Ensure your teammate fixed RLS for this to work
+    final Uint8List imageBytes = await image.readAsBytes();
+    await supabase.storage.from('receipts').uploadBinary(
+      path,
+      imageBytes,
+      fileOptions: const FileOptions(cacheControl: '3600', upsert: false), //
+    );
 
-      // 4. Invoke the Edge Function for OCR
-      final response = await supabase.functions.invoke(
-        'ocr', 
-        body: {'imagePath': storagePath}
-      );
+    // 2. Create Receipt Record with 'pending' status
+    await supabase.from('receipts').insert({
+      'user_id': userId,
+      'image_url': path,
+      'processing_status': 'pending',
+    });
 
-      // 5. Update UI with the AI extracted text
-      setState(() {
-        _ocrResult = response.data['text'] ?? "Processing completed, but no text returned.";
-      });
-
-    } on FunctionException catch (e) {
-      _showError("OCR Processing Failed: ${e.reasonPhrase}");
-    } on StorageException catch (e) {
-      _showError("Image Upload Failed: ${e.message}");
-    } catch (e) {
-      _showError("An unexpected error occurred: $e");
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
+    // 3. Trigger OCR Edge Function
+    final res = await supabase.functions.invoke('ocr', body: {'imagePath': path});
+    
+    setState(() => _ocrResult = res.data['text']);
+    
+  } on AuthException catch (e) {
+    _showError(e.message); //
+  } catch (e) {
+    _showError("Unexpected error occurred. Please try again."); //
+  } finally {
+    setState(() => _isProcessing = false);
   }
+}
 
   void _showError(String message) {
     if (mounted) {

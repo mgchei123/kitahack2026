@@ -1,65 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../main.dart';
 import 'scanner_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  // Following Database Operations: Fetch Inventory with Filter
+  Future<List<Map<String, dynamic>>> _fetchInventory() async {
+    final data = await supabase
+        .from('user_inventory')
+        .select()
+        .eq('is_available', true)
+        .order('expiry_date', ascending: true);
+    return List<Map<String, dynamic>>.from(data);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Receipts'),
-        backgroundColor: const Color(0xFF2E7D32),
+        title: const Text('Inventory Dashboard'),
+        backgroundColor: const Color(0xFF2E7D32), // Kitchen Green
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => Navigator.pushReplacementNamed(context, '/'),
-          )
-        ],
       ),
-      body: Column(
-        children: [
-          // Total Spending Summary Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: const Color(0xFF2E7D32).withOpacity(0.1),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Total Spending (Feb)', style: TextStyle(fontSize: 18)),
-                Text('RM 150.00', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
-              ],
-            ),
-          ),
-          
-          // Placeholder for the list of receipts
-          const Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.receipt_long, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('No receipts yet. Start scanning!', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-      
-      // Floating Action Button to quickly jump to the Scanner
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ScannerScreen()),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _fetchInventory(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // UI/UX Requirement: Always include an EmptyState widget
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          final items = snapshot.data!;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length, // Performance Optimization: Lazy Loading
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.restaurant_menu, color: Color(0xFF2E7D32)),
+                  title: Text(item['ingredient_name']),
+                  subtitle: Text('Expires: ${item['expiry_date']}'),
+                  trailing: Text('${item['quantity']} ${item['unit']}'),
+                ),
+              );
+            },
           );
         },
-        label: const Text('Scan New Receipt'),
-        icon: const Icon(Icons.add_a_photo),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (context) => const ScannerScreen())
+        ),
+        label: const Text('Scan Receipt'),
+        icon: const Icon(Icons.camera_alt),
         backgroundColor: const Color(0xFF2E7D32),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'Your pantry is empty!',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const Text('Scan a receipt to add items automatically.'),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (context) => const ScannerScreen())
+            ),
+            child: const Text('Get Started'),
+          )
+        ],
       ),
     );
   }
