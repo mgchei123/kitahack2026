@@ -1,13 +1,16 @@
 export const environment = {
   production: false,
-  firebase: {
-    apiKey:  "YOUR_FIREBASE_API_KEY",
-    authDomain:  "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID",
-    measurementId: "YOUR_MEASUREMENT_ID"
+  supabase: {
+    url: 'your url', // From Step 2
+    anonKey: 'public anonkey', // From Step 2, fyi this is the public anon key, not the service role key
   },
-  geminiApiKey: "YOUR_GEMINI_API_KEY"
+  geminiApiKey: "yor api key",
+   
+  // AI Engineer's endpoints (to be provided)
+  ai: {
+    ocrEndpoint: 'https://your-ai-api.com/ocr',
+    classificationEndpoint: 'https://your-ai-api.com/classify',
+    mealRecommendationEndpoint: 'https://your-ai-api.com/recommend'
+  }
 };
+

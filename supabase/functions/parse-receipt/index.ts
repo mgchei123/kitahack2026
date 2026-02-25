@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,40 +12,16 @@ serve(async (req) => {
   }
 
   try {
-    // Auth validation
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    console.log('📥 Parse Receipt Request received')
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JWT' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
+    // ✅ No need to validate JWT manually - Supabase already did it!
+    // If we're here, the user is authenticated (verify_jwt = true)
+    
     // Get request body
     const { ocr_text } = await req.json()
     
     if (!ocr_text) {
+      console.error('❌ Missing ocr_text')
       return new Response(
         JSON.stringify({ error: 'Missing ocr_text parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -57,9 +32,10 @@ serve(async (req) => {
 
     // Get Gemini API credentials
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
+    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash-exp'
 
     if (!GEMINI_API_KEY) {
+      console.error('❌ Missing GEMINI_API_KEY')
       return new Response(
         JSON.stringify({ error: 'Parsing service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -79,115 +55,112 @@ CRITICAL RULES:
 2. **Handle Malaysian receipts**: Recognize common Malaysian supermarkets (AEON, Tesco, Giant, 99 Speedmart, etc.)
 
 3. **Extract quantity and unit separately**:
-   - "Rice 2kg" → quantity: 2, unit: "kg"
-   - "Eggs (10pcs)" → quantity: 10, unit: "pieces"
-   - "Soy Sauce" → quantity: 1, unit: "bottle"
+   - "Tomato 500g" → quantity: 500, unit: "g"
+   - "Chicken 1kg" → quantity: 1, unit: "kg"
+   - "Milk 2L" → quantity: 2, unit: "L"
+   - "Eggs 12pcs" → quantity: 12, unit: "pcs"
 
-4. **Currency**: Always use "MYR" for Malaysian receipts
+4. **Parse dates in Malaysian format**: Accept DD/MM/YYYY or DD-MM-YYYY
 
-5. **Date format**: Convert to YYYY-MM-DD
+5. **Return ONLY valid JSON** - no markdown, no explanations
 
 Receipt text:
 ${ocr_text}
 
-Return ONLY valid JSON (no markdown, no code blocks):
+Return JSON in this EXACT format:
 {
-  "store_name": "store name here",
+  "store_name": "string",
   "purchase_date": "YYYY-MM-DD",
-  "total_amount": 0.00,
+  "total_amount": number,
   "currency": "MYR",
   "items": [
     {
-      "name": "normalized ingredient name (singular)",
-      "quantity": 1,
-      "unit": "unit",
-      "price": 0.00
+      "name": "string (normalized, singular)",
+      "quantity": number,
+      "unit": "string",
+      "price": number
     }
   ]
-}
+}`
 
-If you cannot extract a field, use null for strings or 0 for numbers.`
+    console.log('🤖 Calling Gemini API...')
 
-    console.log('🤖 Calling Gemini API for parsing...')
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
-    
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.1,  // Low temperature for consistent parsing
-          maxOutputTokens: 2048
-        }
-      })
-    })
+    // Call Gemini API
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2048,
+          }
+        })
+      }
+    )
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text()
-      console.error('❌ Gemini API error:', errorText)
-      throw new Error(`Gemini API failed: ${geminiResponse.status}`)
+      console.error('❌ Gemini API error:', geminiResponse.status, errorText)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Gemini API failed',
+          details: errorText,
+          status: geminiResponse.status
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const geminiData = await geminiResponse.json()
-    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    console.log('✅ Gemini response received')
 
-    if (!responseText) {
-      throw new Error('Gemini returned empty response')
-    }
-
-    console.log('📄 Raw Gemini response:', responseText)
-
-    // Extract JSON from response (handle markdown code blocks)
-    let parsedData
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    // Extract JSON from Gemini response
+    const generatedText = geminiData.candidates[0].content.parts[0].text
     
-    if (jsonMatch) {
-      parsedData = JSON.parse(jsonMatch[0])
-    } else {
-      throw new Error('No valid JSON found in response')
+    // Remove markdown code blocks if present
+    let jsonText = generatedText.trim()
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '')
     }
-
-    // Validate required fields
-    if (!parsedData.items || !Array.isArray(parsedData.items)) {
-      throw new Error('Invalid parsed data: missing items array')
-    }
-
-    // Set defaults
-    parsedData.currency = parsedData.currency || 'MYR'
-    parsedData.store_name = parsedData.store_name || 'Unknown Store'
-    parsedData.purchase_date = parsedData.purchase_date || new Date().toISOString().split('T')[0]
-    parsedData.total_amount = parsedData.total_amount || 0
-
-    console.log('✅ Parsing completed:', {
-      store: parsedData.store_name,
-      itemCount: parsedData.items.length,
-      total: parsedData.total_amount
-    })
-
+    
+    const parsedData = JSON.parse(jsonText)
+    
+    console.log('✅ Successfully parsed receipt data')
+    
     return new Response(
       JSON.stringify(parsedData),
       { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     )
 
   } catch (error: any) {
-    console.error('❌ Parsing error:', error)
+    console.error('❌ Parse Receipt Error:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Internal server error',
-        details: error.stack
+        stack: error.stack 
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     )
   }
