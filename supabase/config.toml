@@ -1,4 +1,3 @@
-﻿
 [functions.ocr]
 enabled = true
 verify_jwt = false
