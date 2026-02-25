@@ -6,14 +6,13 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     console.log('📥 OCR Request received')
-        
+    
     // Get request body
     const { image_url } = await req.json()
     
@@ -27,7 +26,6 @@ serve(async (req) => {
 
     console.log('📸 Processing image:', image_url)
 
-    // Get Gemini API credentials
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
     const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash-exp'
 

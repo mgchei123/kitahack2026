@@ -1,17 +1,17 @@
 [functions.ocr]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/ocr/deno.json"
 entrypoint = "./functions/ocr/index.ts"
 
 [functions.parse-receipt]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/parse-receipt/deno.json"
 entrypoint = "./functions/parse-receipt/index.ts"
 
 [functions.classify-items]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/classify-items/deno.json"
 entrypoint = "./functions/classify-items/index.ts"

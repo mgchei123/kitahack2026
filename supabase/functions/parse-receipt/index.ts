@@ -6,7 +6,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -14,10 +13,6 @@ serve(async (req) => {
   try {
     console.log('📥 Parse Receipt Request received')
     
-    // ✅ No need to validate JWT manually - Supabase already did it!
-    // If we're here, the user is authenticated (verify_jwt = true)
-    
-    // Get request body
     const { ocr_text } = await req.json()
     
     if (!ocr_text) {
@@ -30,7 +25,6 @@ serve(async (req) => {
 
     console.log('📝 Parsing receipt text...')
 
-    // Get Gemini API credentials
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
     const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash-exp'
 
@@ -42,7 +36,6 @@ serve(async (req) => {
       )
     }
 
-    // Enhanced prompt for Malaysian receipts with ingredient normalization
     const prompt = `You are a Malaysian receipt parser. Parse this receipt text and extract structured data.
 
 CRITICAL RULES:
@@ -85,7 +78,6 @@ Return JSON in this EXACT format:
 
     console.log('🤖 Calling Gemini API...')
 
-    // Call Gemini API
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -123,10 +115,8 @@ Return JSON in this EXACT format:
     const geminiData = await geminiResponse.json()
     console.log('✅ Gemini response received')
 
-    // Extract JSON from Gemini response
     const generatedText = geminiData.candidates[0].content.parts[0].text
     
-    // Remove markdown code blocks if present
     let jsonText = generatedText.trim()
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
