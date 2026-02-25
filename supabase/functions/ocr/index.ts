@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts'
+import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +8,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders, status: 200 })
   }
 
   try {
@@ -39,27 +39,28 @@ serve(async (req) => {
 
     console.log('🤖 Fetching image...')
 
-    // Fetch the image
     const imageResponse = await fetch(image_url)
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`)
     }
     
     const imageBuffer = await imageResponse.arrayBuffer()
-    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
-    
+    let contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
+    if (contentType.includes('octet-stream')) {
+      contentType = 'image/jpeg' // ✅ 强制转成 Gemini 认识的格式
+    }
+
     console.log('📊 Image size:', imageBuffer.byteLength, 'bytes')
     console.log('📄 Content type:', contentType)
 
-    // ✅ FIX: Use Deno's standard base64 encoder
-    const base64Image = encode(new Uint8Array(imageBuffer))
+    // ✅ Use Deno standard library base64 encoder
+const base64Image = encodeBase64(new Uint8Array(imageBuffer))
     
     console.log('📊 Base64 length:', base64Image.length)
-    console.log('📊 Base64 first 50 chars:', base64Image.substring(0, 50))
+    console.log('📊 Base64 first 20 chars:', base64Image.substring(0, 20))
 
     console.log('🤖 Calling Gemini Vision API with model:', GEMINI_MODEL)
 
-    // Call Gemini Vision API
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -107,11 +108,9 @@ serve(async (req) => {
     const geminiData = await geminiResponse.json()
     console.log('✅ Gemini response received')
     
-    // Validate response structure
     if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
       console.error('❌ Invalid response structure')
       
-      // Check for safety blocks
       if (geminiData.candidates?.[0]?.finishReason) {
         const reason = geminiData.candidates[0].finishReason
         return new Response(
