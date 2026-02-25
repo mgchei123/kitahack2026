@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +14,6 @@ serve(async (req) => {
   try {
     console.log('📥 OCR Request received')
     
-    // Get request body
     const { image_url } = await req.json()
     
     if (!image_url) {
@@ -27,7 +27,7 @@ serve(async (req) => {
     console.log('📸 Processing image:', image_url)
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash-exp'
+    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-1.5-flash'
 
     if (!GEMINI_API_KEY) {
       console.error('❌ Missing GEMINI_API_KEY')
@@ -37,19 +37,29 @@ serve(async (req) => {
       )
     }
 
-    console.log('🤖 Calling Gemini Vision API...')
+    console.log('🤖 Fetching image...')
 
-    // Fetch the image to convert to base64
+    // Fetch the image
     const imageResponse = await fetch(image_url)
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`)
     }
     
-    const imageBlob = await imageResponse.blob()
-    const arrayBuffer = await imageBlob.arrayBuffer()
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    const imageBuffer = await imageResponse.arrayBuffer()
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
+    
+    console.log('📊 Image size:', imageBuffer.byteLength, 'bytes')
+    console.log('📄 Content type:', contentType)
 
-    // Call Gemini Vision API for OCR
+    // ✅ FIX: Use Deno's standard base64 encoder
+    const base64Image = encode(new Uint8Array(imageBuffer))
+    
+    console.log('📊 Base64 length:', base64Image.length)
+    console.log('📊 Base64 first 50 chars:', base64Image.substring(0, 50))
+
+    console.log('🤖 Calling Gemini Vision API with model:', GEMINI_MODEL)
+
+    // Call Gemini Vision API
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -61,11 +71,11 @@ serve(async (req) => {
           contents: [{
             parts: [
               {
-                text: `Extract ALL text from this receipt image. Return ONLY the raw text exactly as it appears on the receipt, line by line. Do not add any explanations, formatting, or interpretation. Just the text.`
+                text: "Extract ALL text from this receipt image. Return ONLY the raw text exactly as it appears on the receipt, line by line. Do not add explanations or formatting."
               },
               {
                 inline_data: {
-                  mime_type: 'image/jpeg',
+                  mime_type: contentType,
                   data: base64Image
                 }
               }
@@ -79,13 +89,15 @@ serve(async (req) => {
       }
     )
 
+    console.log('📡 Gemini response status:', geminiResponse.status)
+
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text()
-      console.error('❌ Gemini API error:', geminiResponse.status, errorText)
+      console.error('❌ Gemini API error:', errorText.substring(0, 500))
       return new Response(
         JSON.stringify({ 
           error: 'Gemini API failed',
-          details: errorText,
+          details: errorText.substring(0, 500),
           status: geminiResponse.status
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -93,9 +105,31 @@ serve(async (req) => {
     }
 
     const geminiData = await geminiResponse.json()
+    console.log('✅ Gemini response received')
+    
+    // Validate response structure
+    if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('❌ Invalid response structure')
+      
+      // Check for safety blocks
+      if (geminiData.candidates?.[0]?.finishReason) {
+        const reason = geminiData.candidates[0].finishReason
+        return new Response(
+          JSON.stringify({ 
+            error: `Gemini blocked response: ${reason}`,
+            details: 'Content was blocked by safety filters'
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      throw new Error('Invalid Gemini response structure')
+    }
+    
     const rawText = geminiData.candidates[0].content.parts[0].text
 
     console.log('✅ OCR completed successfully')
+    console.log('📝 Text length:', rawText.length)
 
     return new Response(
       JSON.stringify({
@@ -112,11 +146,10 @@ serve(async (req) => {
     )
 
   } catch (error: any) {
-    console.error('❌ OCR Error:', error)
+    console.error('❌ OCR Error:', error.message)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Internal server error',
-        stack: error.stack 
+        error: error.message || 'Internal server error'
       }),
       { 
         status: 500, 
