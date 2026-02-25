@@ -1,77 +1,33 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to convert ArrayBuffer to base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const len = bytes.byteLength
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders, status: 200 })
   }
 
   try {
-    // ✅ FIX: Get Authorization header
-    const authHeader = req.headers.get('Authorization')
+    console.log('📥 OCR Request received')
     
-    console.log('📥 Incoming request headers:', {
-      hasAuth: !!authHeader,
-      hasApiKey: !!req.headers.get('apikey'),
-      contentType: req.headers.get('content-type')
-    })
-
-    if (!authHeader) {
-      console.error('❌ Missing Authorization header')
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // ✅ FIX: Create Supabase client with SERVICE ROLE for validation
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('❌ Missing Supabase credentials')
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Create admin client for auth validation
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-
-    // ✅ FIX: Validate JWT using admin client
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-
-    if (authError || !user) {
-      console.error('❌ JWT validation failed:', authError?.message)
-      return new Response(
-        JSON.stringify({ 
-          code: 401,
-          message: 'Invalid JWT',
-          error: authError?.message || 'Token validation failed'
-        }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('✅ Authenticated user:', {
-      id: user.id,
-      email: user.email || '(anonymous)',
-      isAnonymous: user.is_anonymous
-    })
-
-    // ✅ Get and validate request body
     const { image_url } = await req.json()
     
     if (!image_url) {
-      console.error('❌ Missing image_url in request')
+      console.error('❌ Missing image_url')
       return new Response(
         JSON.stringify({ error: 'Missing image_url parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -80,97 +36,135 @@ serve(async (req) => {
 
     console.log('📸 Processing image:', image_url)
 
-    // ✅ Get Gemini API credentials
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
+    const GEMINI_MODEL = 'gemini-2.5-flash' // Updated to latest model
 
     if (!GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY not configured')
+      console.error('❌ Missing GEMINI_API_KEY')
       return new Response(
         JSON.stringify({ error: 'OCR service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // ✅ Fetch image and convert to base64
-    console.log('📥 Fetching image...')
+    console.log('🤖 Fetching image...')
+
     const imageResponse = await fetch(image_url)
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`)
     }
-
-    const imageBuffer = await imageResponse.arrayBuffer()
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
-
-    console.log('🤖 Calling Gemini API...')
-
-    // ✅ Call Gemini Vision API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
     
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { 
-              text: "Extract all text from this receipt image. Return only the raw text exactly as it appears, preserving line breaks and formatting." 
-            },
-            {
-              inline_data: {
-                mime_type: "image/jpeg",
-                data: base64Image
+    const imageBuffer = await imageResponse.arrayBuffer()
+    let contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
+    if (contentType.includes('octet-stream')) {
+      contentType = 'image/jpeg'
+    }
+    
+    console.log('📊 Image size:', imageBuffer.byteLength, 'bytes')
+    console.log('📄 Content type:', contentType)
+
+    const base64Image = arrayBufferToBase64(imageBuffer)
+    
+    console.log('📊 Base64 length:', base64Image.length)
+    console.log('📊 Base64 first 20 chars:', base64Image.substring(0, 20))
+
+    console.log('🤖 Calling Gemini Vision API with model:', GEMINI_MODEL)
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                text: "Extract ALL text from this receipt image. Return ONLY the raw text exactly as it appears on the receipt, line by line. Do not add explanations or formatting."
+              },
+              {
+                inlineData: {
+                  mimeType: contentType,
+                  data: base64Image
+                }
               }
-            }
-          ]
-        }]
-      })
-    })
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2048,
+          }
+        })
+      }
+    )
+
+    console.log('📡 Gemini response status:', geminiResponse.status)
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text()
-      console.error('❌ Gemini API error:', errorText)
-      throw new Error(`Gemini API failed: ${geminiResponse.status}`)
+      console.error('❌ Gemini API error:', errorText.substring(0, 500))
+      return new Response(
+        JSON.stringify({ 
+          error: 'Gemini API failed',
+          details: errorText.substring(0, 500),
+          status: geminiResponse.status
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const geminiData = await geminiResponse.json()
-    const raw_text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
-    if (!raw_text) {
-      console.warn('⚠️ Gemini returned empty text')
+    console.log('✅ Gemini response received')
+    
+    if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('❌ Invalid response structure')
+      
+      if (geminiData.candidates?.[0]?.finishReason) {
+        const reason = geminiData.candidates[0].finishReason
+        return new Response(
+          JSON.stringify({ 
+            error: `Gemini blocked response: ${reason}`,
+            details: 'Content was blocked by safety filters'
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      throw new Error('Invalid Gemini response structure')
     }
+    
+    const rawText = geminiData.candidates[0].content.parts[0].text
 
-    // ✅ Calculate confidence (basic heuristic)
-    const confidence = raw_text.length > 10 ? 0.95 : 0.5
-
-    const result = {
-      raw_text,
-      confidence
-    }
-
-    console.log('✅ OCR completed:', {
-      textLength: raw_text.length,
-      confidence
-    })
+    console.log('✅ OCR completed successfully')
+    console.log('📝 Text length:', rawText.length)
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        raw_text: rawText,
+        confidence: 0.95,
+        model: GEMINI_MODEL
+      }),
       { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     )
 
   } catch (error: any) {
-    console.error('❌ Unexpected error:', error)
+    console.error('❌ OCR Error:', error.message)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Internal server error',
-        stack: error.stack
+        error: error.message || 'Internal server error'
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
       }
     )
   }
