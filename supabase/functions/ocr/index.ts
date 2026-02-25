@@ -1,9 +1,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Helper function to convert ArrayBuffer to base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const len = bytes.byteLength
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
 }
 
 serve(async (req) => {
@@ -27,7 +37,7 @@ serve(async (req) => {
     console.log('📸 Processing image:', image_url)
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-1.5-flash'
+    const GEMINI_MODEL = 'gemini-2.5-flash' // Updated to latest model
 
     if (!GEMINI_API_KEY) {
       console.error('❌ Missing GEMINI_API_KEY')
@@ -47,14 +57,13 @@ serve(async (req) => {
     const imageBuffer = await imageResponse.arrayBuffer()
     let contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
     if (contentType.includes('octet-stream')) {
-      contentType = 'image/jpeg' // ✅ 强制转成 Gemini 认识的格式
+      contentType = 'image/jpeg'
     }
-
+    
     console.log('📊 Image size:', imageBuffer.byteLength, 'bytes')
     console.log('📄 Content type:', contentType)
 
-    // ✅ Use Deno standard library base64 encoder
-const base64Image = encodeBase64(new Uint8Array(imageBuffer))
+    const base64Image = arrayBufferToBase64(imageBuffer)
     
     console.log('📊 Base64 length:', base64Image.length)
     console.log('📊 Base64 first 20 chars:', base64Image.substring(0, 20))
@@ -75,8 +84,8 @@ const base64Image = encodeBase64(new Uint8Array(imageBuffer))
                 text: "Extract ALL text from this receipt image. Return ONLY the raw text exactly as it appears on the receipt, line by line. Do not add explanations or formatting."
               },
               {
-                inline_data: {
-                  mime_type: contentType,
+                inlineData: {
+                  mimeType: contentType,
                   data: base64Image
                 }
               }
