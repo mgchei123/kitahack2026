@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'scanner_screen.dart';
+import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Navigate to scanner screen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ScannerScreen()),
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
       }
     } on AuthException catch (e) {
