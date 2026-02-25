@@ -51,6 +51,11 @@ export class SupabaseService {
     }
   }
 
+  getSupabaseUrl(): string {
+  // Extract URL from the client
+  return this.client['supabaseUrl'] || 'https://your-project.supabase.co';
+}
+
   // Email/password auth (optional - for later)
   async signUp(email: string, password: string) {
     return await this.supabase.auth.signUp({ email, password });

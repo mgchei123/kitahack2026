@@ -8,6 +8,7 @@ import { MealService } from './services/meal.service';
 import { AuthService } from './services/auth.service'; 
 import { ReceiptProcessorService } from './services/receipt-processor.service';
 import { InventoryService } from './services/inventory.service';
+import { OcrService } from './services/ocr.service';
 
 @Component({
   selector: 'app-root',
@@ -20,165 +21,154 @@ import { InventoryService } from './services/inventory.service';
       <!-- Auth Status -->
       <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 4px;">
         <strong>Auth Status:</strong> {{ authStatus }}
-        
+        <br><br>
         @if (!isAuthenticated) {
-          <div style="margin-top: 10px;">
-            <!-- Quick Demo Button -->
-            <button (click)="signInAnonymously()" 
-                    style="padding: 8px 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 4px; margin-right: 10px;">
-              🚀 Quick Demo (No Login)
-            </button>
-            
-            <!-- Email Login Toggle -->
-            <button (click)="showEmailAuth = !showEmailAuth" 
-                    style="padding: 8px 16px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 4px;">
-              {{ showEmailAuth ? '❌ Hide Email Login' : '📧 Email Login' }}
-            </button>
-          </div>
+          <button 
+            (click)="signInAnonymously()" 
+            style="padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+            🚀 Sign In Anonymously
+          </button>
           
-          <!-- Email Auth Form -->
-          @if (showEmailAuth) {
-            <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 4px; border: 1px solid #ddd;">
-              <div style="margin-bottom: 10px;">
-                <input 
-                  type="email" 
-                  [(ngModel)]="email" 
-                  placeholder="Email"
-                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
-              </div>
-              <div style="margin-bottom: 10px;">
-                <input 
-                  type="password" 
-                  [(ngModel)]="password" 
-                  placeholder="Password (min 6 characters)"
-                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
-              </div>
-              <div>
-                <button (click)="signInWithEmail()" 
-                        [disabled]="authLoading"
-                        style="padding: 8px 16px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-                  {{ authLoading ? '⏳ Signing In...' : '🔑 Sign In' }}
-                </button>
-                <button (click)="signUpWithEmail()" 
-                        [disabled]="authLoading"
-                        style="padding: 8px 16px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                  {{ authLoading ? '⏳ Creating Account...' : '✨ Create Account' }}
-                </button>
-              </div>
-              @if (authError) {
-                <p style="color: #ef4444; margin-top: 10px; font-size: 14px;">{{ authError }}</p>
-              }
-            </div>
-          }
-        } @else {
-          <button (click)="signOut()" 
-                  style="margin-left: 10px; padding: 8px 16px; cursor: pointer; background: #ef4444; color: white; border: none; border-radius: 4px;">
+          <button 
+            (click)="showEmailAuth = !showEmailAuth" 
+            style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            📧 {{ showEmailAuth ? 'Hide' : 'Show' }} Email Auth
+          </button>
+        }
+        @if (isAuthenticated) {
+          <button 
+            (click)="signOut()" 
+            style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
             🚪 Sign Out
           </button>
         }
       </div>
 
-      <hr style="margin: 30px 0;">
-
-      <!-- Test AI -->
-      <div style="margin: 20px 0;">
-        <button 
-          (click)="testAI()" 
-          [disabled]="aiLoading"
-          style="padding: 10px 20px; font-size: 16px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 4px;">
-          {{ aiLoading ? '⏳ Thinking...' : '🤖 Test Gemini AI' }}
-        </button>
-        
-        <div style="margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 4px; min-height: 60px;">
-          <strong>AI Says:</strong>
-          <p style="margin: 5px 0 0 0; white-space: pre-wrap;">{{ aiResponse }}</p>
+      <!-- Email Auth Form -->
+      @if (showEmailAuth && !isAuthenticated) {
+        <div style="margin: 20px 0; padding: 15px; background: #fff3e0; border-radius: 4px;">
+          <h3>Email Authentication</h3>
+          <input 
+            type="email" 
+            [(ngModel)]="email" 
+            placeholder="email@example.com"
+            style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+          <input 
+            type="password" 
+            [(ngModel)]="password" 
+            placeholder="password"
+            style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+          
+          <button 
+            (click)="signInWithEmail()" 
+            [disabled]="authLoading"
+            style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 5px 5px 0;">
+            {{ authLoading ? '⏳ Signing in...' : '🔑 Sign In' }}
+          </button>
+          
+          <button 
+            (click)="signUpWithEmail()" 
+            [disabled]="authLoading"
+            style="padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 0;">
+            {{ authLoading ? '⏳ Creating...' : '✨ Sign Up' }}
+          </button>
+          
+          @if (authError) {
+            <div style="color: #f44336; margin-top: 10px;">{{ authError }}</div>
+          }
         </div>
-      </div>
-
-      <hr style="margin: 30px 0;">
-
-      <!-- Test Database -->
-      <div style="margin: 20px 0;">
-        <button 
-          (click)="testDatabase()" 
-          [disabled]="dbLoading || !isAuthenticated"
-          style="padding: 10px 20px; font-size: 16px; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 4px;"
-          [style.opacity]="!isAuthenticated ? '0.5' : '1'">
-          {{ dbLoading ? '⏳ Testing...' : '🗄️ Test Supabase Database' }}
-        </button>
-        
-        <div style="margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-          <strong>DB Status:</strong> {{ dbStatus }}
-        </div>
-      </div>
+      }
 
       <hr style="margin: 30px 0;">
 
       <!-- Test Receipt Upload -->
       <div style="margin: 20px 0;">
-        <h3>Test Receipt Upload</h3>
+        <h3>📸 Receipt Upload & Processing</h3>
         @if (!isAuthenticated) {
           <p style="color: #ef4444;">⚠️ Please sign in first to upload receipts</p>
         }
-        <input 
-          type="file" 
-          (change)="onFileSelected($event)" 
-          accept="image/*"
-          [disabled]="!isAuthenticated">
-        <button 
-          (click)="testReceiptUpload()" 
-          [disabled]="!selectedFile || uploadLoading || !isAuthenticated"
-          style="margin-left: 10px; padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;"
-          [style.opacity]="(!selectedFile || !isAuthenticated) ? '0.5' : '1'">
-          {{ uploadLoading ? '⏳ Uploading...' : '📤 Upload Test Receipt' }}
-        </button>
-        
-        <button 
-          (click)="testFullPipeline()" 
-          [disabled]="!selectedFile || !isAuthenticated || uploadLoading"
-          style="margin-left: 10px; padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer;"
-          [style.opacity]="(!selectedFile || !isAuthenticated) ? '0.5' : '1'">
-          {{ uploadLoading ? '⏳ Processing...' : '🚀 Test Full Pipeline' }}
-        </button>
-
-        <div style="margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-          {{ uploadStatus }}
-        </div>
+        @if (isAuthenticated) {
+          <input 
+            type="file" 
+            (change)="onFileSelected($event)" 
+            accept="image/*"
+            style="margin-bottom: 10px;">
+          <br>
+          <button 
+            (click)="testReceiptUpload()" 
+            [disabled]="!selectedFile || uploadLoading"
+            style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            {{ uploadLoading ? '⏳ Processing...' : '📤 Upload & Process Receipt' }}
+          </button>
+          
+          <div style="margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+            <strong>Status:</strong> {{ uploadStatus }}
+          </div>
+        }
       </div>
 
       <hr style="margin: 30px 0;">
 
-      <!-- My Receipts -->
+      <!-- View Receipts -->
       <div style="margin: 20px 0;">
-        <button 
-          (click)="loadReceipts()" 
-          [disabled]="!isAuthenticated || loadingReceipts"
-          style="padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer;"
-          [style.opacity]="!isAuthenticated ? '0.5' : '1'">
-          {{ loadingReceipts ? '⏳ Loading...' : '📋 Load My Receipts' }}
-        </button>
-        
-        <div style="margin-top: 10px;">
-          <strong>Total Receipts:</strong> {{ receipts.length }}
+        <h3>📋 My Receipts</h3>
+        @if (!isAuthenticated) {
+          <p style="color: #ef4444;">⚠️ Please sign in to view receipts</p>
+        }
+        @if (isAuthenticated) {
+          <button 
+            (click)="loadReceipts()" 
+            [disabled]="loadingReceipts"
+            style="padding: 10px 20px; background: #9c27b0; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            {{ loadingReceipts ? '⏳ Loading...' : '🔄 Refresh Receipts' }}
+          </button>
           
-          @if (receipts.length === 0 && isAuthenticated) {
-            <p style="color: #666; font-style: italic;">No receipts yet. Upload one to get started!</p>
+          @if (receipts.length === 0 && !loadingReceipts) {
+            <p style="color: #666; margin-top: 10px;">No receipts yet. Upload one above!</p>
           }
           
           @if (receipts.length > 0) {
-            <ul style="list-style: none; padding: 0;">
+            <ul style="list-style: none; padding: 0; margin-top: 10px;">
               @for (receipt of receipts; track receipt.id) {
-                <li style="padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 4px;">
-                  <strong>{{ receipt.store_name }}</strong> - 
-                  <span style="color: #10b981; font-weight: bold;">\${{ receipt.total_amount }}</span> - 
-                  <span style="color: #666;">{{ receipt.created_at | date:'short' }}</span>
-                  <br>
-                  <small style="color: #666;">{{ receipt.items?.length || 0 }} items</small>
+                <li style="padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 4px; border-left: 4px solid #4caf50;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <strong style="font-size: 16px;">{{ receipt.store_name }}</strong>
+                      <br>
+                      <span style="color: #10b981; font-weight: bold; font-size: 18px;">{{ receipt.currency }} {{ receipt.total_amount }}</span>
+                      <br>
+                      <small style="color: #666;">
+                        📅 {{ receipt.purchase_date | date:'short' }} | 
+                        📦 {{ receipt.cookable_items?.length || 0 }} cookable items |
+                        🏷️ {{ receipt.non_cookable_items?.length || 0 }} non-cookable
+                      </small>
+                      <br>
+                      <small style="color: #666;">
+                        Status: 
+                        @if (receipt.processing_status === 'completed') {
+                          <span style="color: #4caf50; font-weight: bold;">✅ Completed</span>
+                        } @else if (receipt.processing_status === 'ocr_completed') {
+                          <span style="color: #2196f3; font-weight: bold;">🔍 OCR Done</span>
+                        } @else if (receipt.processing_status === 'processing') {
+                          <span style="color: #ff9800; font-weight: bold;">⏳ Processing</span>
+                        } @else if (receipt.processing_status === 'failed') {
+                          <span style="color: #f44336; font-weight: bold;">❌ Failed</span>
+                        } @else {
+                          <span style="color: #9e9e9e;">⏸️ {{ receipt.processing_status }}</span>
+                        }
+                      </small>
+                    </div>
+                    <button 
+                      (click)="viewReceiptDetails(receipt.id)"
+                      style="padding: 8px 16px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                      👁️ View
+                    </button>
+                  </div>
                 </li>
               }
             </ul>
           }
-        </div>
+        }
       </div>
     </div>
   `
@@ -194,12 +184,6 @@ export class App implements OnInit {
   authLoading = false;
   authError = '';
   
-  aiLoading = false;
-  aiResponse = 'Click the button to test AI!';
-  
-  dbLoading = false;
-  dbStatus = 'Not tested yet';
-  
   selectedFile: File | null = null;
   uploadLoading = false;
   uploadStatus = 'No file selected';
@@ -214,16 +198,19 @@ export class App implements OnInit {
     private mealService: MealService,
     private auth: AuthService,
     private receiptProcessor: ReceiptProcessorService,  
-    private inventory: InventoryService  
+    private inventory: InventoryService,
+    private ocr: OcrService
   ) {
+    // Expose services to window for debugging
     (window as any).backend = {
       gemini: this.gemini,
       supabase: this.supabase,
       receipt: this.receiptService,
       meal: this.mealService,
       auth: this.auth,
-      processor: this.receiptProcessor,  // ADD THIS
-      inventory: this.inventory  // ADD THIS
+      processor: this.receiptProcessor,
+      inventory: this.inventory,
+      ocr: this.ocr
     };
     console.log('✅ Access backend services via: window.backend');
   }
@@ -241,7 +228,10 @@ export class App implements OnInit {
     });
   }
 
-  // 🚀 Anonymous Sign In
+  // ============================================
+  // AUTH METHODS
+  // ============================================
+
   async signInAnonymously() {
     try {
       this.authStatus = '⏳ Signing in anonymously...';
@@ -258,7 +248,6 @@ export class App implements OnInit {
     }
   }
 
-  // 📧 Email Sign In
   async signInWithEmail() {
     if (!this.email || !this.password) {
       this.authError = 'Please enter email and password';
@@ -278,13 +267,13 @@ export class App implements OnInit {
         this.password = '';
       }
     } catch (error: any) {
-      this.authError = error.message || 'Failed to sign in';
+      this.authError = error.message;
+      console.error('Sign in error:', error);
     } finally {
       this.authLoading = false;
     }
   }
 
-  // ✨ Email Sign Up
   async signUpWithEmail() {
     if (!this.email || !this.password) {
       this.authError = 'Please enter email and password';
@@ -302,118 +291,72 @@ export class App implements OnInit {
     try {
       const user = await this.auth.signUp(this.email, this.password);
       if (user) {
-        this.authStatus = `✅ Account created! Check your email to verify.`;
-        this.authError = '📧 Please check your email to verify your account';
+        this.authStatus = `✅ Account created! Signed in as ${user.email}`;
+        this.isAuthenticated = true;
+        this.showEmailAuth = false;
+        this.email = '';
+        this.password = '';
       }
     } catch (error: any) {
-      this.authError = error.message || 'Failed to create account';
+      this.authError = error.message;
+      console.error('Sign up error:', error);
     } finally {
       this.authLoading = false;
     }
   }
 
-  // 🚪 Sign Out
   async signOut() {
     try {
       await this.auth.signOut();
       this.authStatus = '✅ Signed out successfully';
       this.isAuthenticated = false;
       this.receipts = [];
-      this.selectedFile = null;
-      this.uploadStatus = 'No file selected';
-      this.showEmailAuth = false;
-      this.email = '';
-      this.password = '';
     } catch (error: any) {
+      this.authStatus = `❌ Sign out error: ${error.message}`;
       console.error('Sign out error:', error);
     }
   }
 
-  async testAI() {
-    this.aiLoading = true;
-    this.aiResponse = 'Thinking...';
-    
-    try {
-      const response = await this.gemini.generateText(
-        'Tell me a fun fact about food waste and sustainability in one sentence.'
-      );
-      this.aiResponse = response || 'No response from AI';
-    } catch (error: any) {
-      this.aiResponse = `❌ Error: ${error.message || 'Failed to connect to Gemini AI'}`;
-      console.error('AI error:', error);
-    } finally {
-      this.aiLoading = false;
-    }
-  }
-
-  async testDatabase() {
-    this.dbLoading = true;
-    this.dbStatus = '⏳ Testing connection...';
-    
-    try {
-      const { data, error } = await this.supabase.client
-        .from('receipts')
-        .select('count');
-      
-      if (error) throw error;
-      this.dbStatus = `✅ Connected! Database is working. (Count query successful)`;
-    } catch (error: any) {
-      this.dbStatus = `❌ Error: ${error.message}`;
-      console.error('Database error:', error);
-    } finally {
-      this.dbLoading = false;
-    }
-  }
+  // ============================================
+  // RECEIPT METHODS
+  // ============================================
 
   onFileSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        this.uploadStatus = '❌ Please select an image file';
-        this.selectedFile = null;
-        return;
-      }
-      
-      if (file.size > 5 * 1024 * 1024) {
-        this.uploadStatus = '❌ File too large (max 5MB)';
-        this.selectedFile = null;
-        return;
-      }
-      
       this.selectedFile = file;
-      this.uploadStatus = `✅ Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      this.uploadStatus = `Selected: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+      console.log('📁 File selected:', file.name);
     }
   }
 
   async testReceiptUpload() {
     if (!this.selectedFile) {
-      this.uploadStatus = '❌ No file selected';
+      this.uploadStatus = '❌ Please select a file first';
       return;
     }
-    
+
     this.uploadLoading = true;
-    this.uploadStatus = '⏳ Uploading image and saving data...';
-    
+    this.uploadStatus = '⏳ Step 1/6: Uploading image...';
+
     try {
-      const result = await this.receiptService.uploadReceipt(
-        this.selectedFile,
-        {
-          store_name: 'Test Store',
-          total_amount: 99.99,
-          currency: 'USD',
-          items: [
-            { name: 'Test Item 1', price: 50.00, quantity: 1 },
-            { name: 'Test Item 2', price: 49.99, quantity: 1 }
-          ]
-        }
-      );
+      console.log('🚀 Starting receipt processing...');
       
-      this.uploadStatus = `✅ Success! Receipt ID: ${result.receiptId}`;
-      setTimeout(() => this.loadReceipts(), 500);
+      // Process receipt through the full pipeline
+      const receiptId = await this.receiptProcessor.processReceiptFull(this.selectedFile);
+      
+      this.uploadStatus = `✅ Receipt processed successfully! ID: ${receiptId}`;
+      console.log('✅ Receipt processing complete:', receiptId);
+      
+      // Refresh receipts list
+      await this.loadReceipts();
+      
+      // Reset file input
       this.selectedFile = null;
+      
     } catch (error: any) {
       this.uploadStatus = `❌ Error: ${error.message}`;
-      console.error('Upload error:', error);
+      console.error('❌ Receipt upload failed:', error);
     } finally {
       this.uploadLoading = false;
     }
@@ -421,42 +364,21 @@ export class App implements OnInit {
 
   async loadReceipts() {
     this.loadingReceipts = true;
-    
     try {
       this.receipts = await this.receiptService.getUserReceipts();
-      console.log('Loaded receipts:', this.receipts);
+      console.log(`📋 Loaded ${this.receipts.length} receipts`);
     } catch (error: any) {
-      console.error('Error loading receipts:', error);
-      alert(`Failed to load receipts: ${error.message}`);
+      console.error('❌ Error loading receipts:', error);
     } finally {
       this.loadingReceipts = false;
     }
   }
-  async testFullPipeline() {
-  if (!this.selectedFile) {
-    alert('Please select a receipt image first');
-    return;
-  }
 
-  this.uploadLoading = true;
-  this.uploadStatus = '⏳ Processing receipt (Mock AI)...';
-
-  try {
-    const receiptId = await this.receiptProcessor.processReceiptFull(this.selectedFile);
-    this.uploadStatus = `✅ Success! Receipt ID: ${receiptId}\nCheck console for details.`;
-    
-    // Reload receipts to show new one
-    await this.loadReceipts();
-    
-    // Show inventory count
-    const inventory = await this.inventory.getAvailableIngredients();
-    console.log('📦 Current inventory:', inventory);
-    alert(`✅ Processing complete!\n${inventory.length} ingredients in inventory`);
-  } catch (error: any) {
-    this.uploadStatus = `❌ Error: ${error.message}`;
-    console.error('Full pipeline error:', error);
-  } finally {
-    this.uploadLoading = false;
-  }
+  viewReceiptDetails(receiptId: string) {
+    const receipt = this.receipts.find(r => r.id === receiptId);
+    if (receipt) {
+      console.log('📄 Receipt Details:', receipt);
+      alert(`Receipt Details:\n\nStore: ${receipt.store_name}\nTotal: ${receipt.currency} ${receipt.total_amount}\nStatus: ${receipt.processing_status}\n\nCheck console for full details.`);
+    }
   }
 }
