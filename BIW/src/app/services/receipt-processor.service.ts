@@ -244,23 +244,36 @@ export class ReceiptProcessorService {
         const originalItem = items.find(item => 
           this.normalizeItemName(item.name) === this.normalizeItemName(classified.name)
         );
+
+        // Skip if original item not found
+        if (!originalItem) {
+          console.warn('⚠️ Could not find original item for:', classified.name);
+          return null;
+        }
+
         return {
           ...originalItem,
           category: classified.category,
           confidence: classified.confidence
         };
-      });
+      }).filter((item: any) => item !== null);
 
       const nonCookable = classificationData.non_cookable.map((classified: any) => {
         const originalItem = items.find(item => 
           this.normalizeItemName(item.name) === this.normalizeItemName(classified.name)
         );
+        // Skip if original item not found
+        if (!originalItem) {
+          console.warn('⚠️ Could not find original item for:', classified.name);
+          return null;
+        }
+        
         return {
           ...originalItem,
           category: classified.category,
           confidence: classified.confidence
         };
-      });
+      }).filter((item: any) => item !== null);
       
       return { cookable, nonCookable };
       
@@ -282,6 +295,14 @@ export class ReceiptProcessorService {
   private predictExpiryDate(itemName: string, category: string, purchaseDate: string): string {
     const purchase = new Date(purchaseDate);
     let daysUntilExpiry = 7;
+
+      // Add null/undefined check
+  if (!itemName) {
+    console.warn('⚠️ Missing item name, using default expiry');
+    const expiryDate = new Date(purchase);
+    expiryDate.setDate(expiryDate.getDate() + 30);
+    return expiryDate.toISOString().split('T')[0];
+  }
 
     const expiryMap: { [key: string]: number } = {
       'protein': 3,

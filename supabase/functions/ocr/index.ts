@@ -37,7 +37,7 @@ serve(async (req) => {
     console.log('📸 Processing image:', image_url)
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = 'gemini-2.5-flash' // Updated to latest model
+    const GEMINI_MODEL = 'gemini-2.5-flash-lite' // Updated to latest model
 
     if (!GEMINI_API_KEY) {
       console.error('❌ Missing GEMINI_API_KEY')
@@ -93,7 +93,7 @@ serve(async (req) => {
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
           }
         })
       }

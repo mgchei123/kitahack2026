@@ -30,17 +30,24 @@ export class InventoryService {
       const userId = this.supabase.userId;
       if (!userId) throw new Error('User not authenticated');
 
-      const inventoryItems = cookableItems.map(item => ({
-        user_id: userId,
-        ingredient_name: item.name,
-        quantity: item.quantity || 1,
-        unit: item.unit || 'pieces',
-        category: item.category,
-        expiry_date: item.expiry_date,
-        source: 'receipt' as const,
-        receipt_id: receiptId,
-        is_available: true
-      }));
+      const inventoryItems = cookableItems
+        .filter(item => item && item.name) // Filter out items without names
+        .map(item => ({
+          user_id: userId,
+          ingredient_name: item.name,
+          quantity: item.quantity || 1,
+          unit: item.unit || 'pieces',
+          category: item.category,
+          expiry_date: item.expiry_date,
+          source: 'receipt' as const,
+          receipt_id: receiptId,
+          is_available: true
+        }));
+
+      if (inventoryItems.length === 0) {
+        console.warn('⚠️ No valid items to add to inventory');
+        return;
+      }
 
       const { error } = await this.supabase.client
         .from('user_inventory')

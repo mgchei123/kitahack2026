@@ -26,7 +26,7 @@ serve(async (req) => {
     console.log('📝 Parsing receipt text...')
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = 'gemini-2.5-flash'
+    const GEMINI_MODEL = 'gemini-2.5-flash-lite'
 
     if (!GEMINI_API_KEY) {
       console.error('❌ Missing GEMINI_API_KEY')
@@ -93,7 +93,7 @@ Return JSON in this EXACT format:
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 8192,// Increase max tokens for longer receipts
           }
         })
       }
@@ -118,25 +118,52 @@ Return JSON in this EXACT format:
     const generatedText = geminiData.candidates[0].content.parts[0].text
     
     let jsonText = generatedText.trim()
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '')
-    }
-    
-    const parsedData = JSON.parse(jsonText)
-    
-    console.log('✅ Successfully parsed receipt data')
-    
-    return new Response(
-      JSON.stringify(parsedData),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+
+    // Remove markdown code blocks more aggressively
+    jsonText = jsonText.replace(/^```json\s*/g, '') // Remove opening ```json
+    jsonText = jsonText.replace(/^```\s*/g, '')      // Remove opening ```
+    jsonText = jsonText.replace(/\s*```$/g, '')      // Remove closing ```
+    jsonText = jsonText.trim()
+
+    // Try to find JSON object if there's extra text
+    if (!jsonText.startsWith('{')) {
+      const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        jsonText = jsonMatch[0]
       }
-    )
+    }
+
+    console.log('🔍 Cleaned JSON text (first 200 chars):', jsonText.substring(0, 200))
+
+    try {
+      const parsedData = JSON.parse(jsonText)
+      
+      // Validate structure
+      if (!parsedData.items || !Array.isArray(parsedData.items)) {
+        throw new Error('Invalid JSON structure: missing or invalid items array')
+      }
+      
+      console.log('✅ Successfully parsed receipt data')
+      
+      return new Response(
+        JSON.stringify(parsedData),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+      
+    } catch (parseError: any) {
+      console.error('❌ JSON Parse Error:', parseError.message)
+      console.error('📄 Raw Gemini response:', generatedText)
+      console.error('🧹 Cleaned JSON text:', jsonText)
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to parse Gemini response as JSON',
+          details: parseError.message,
+          raw_response: generatedText.substring(0, 500) // First 500 chars for debugging
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
   } catch (error: any) {
     console.error('❌ Parse Receipt Error:', error)
