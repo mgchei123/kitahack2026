@@ -57,7 +57,7 @@ serve(async (req) => {
 
     // Get Gemini API credentials
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-    const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash'
+    const GEMINI_MODEL = 'gemini-2.5-flash-lite'
 
     if (!GEMINI_API_KEY) {
       return new Response(
@@ -203,7 +203,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
         }],
         generationConfig: {
           temperature: 0.1,  // Very low temperature for consistent classification
-          maxOutputTokens: 4096
+          maxOutputTokens: 8192
         }
       })
     })
