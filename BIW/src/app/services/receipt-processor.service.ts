@@ -244,23 +244,36 @@ export class ReceiptProcessorService {
         const originalItem = items.find(item => 
           this.normalizeItemName(item.name) === this.normalizeItemName(classified.name)
         );
+
+        // Skip if original item not found
+        if (!originalItem) {
+          console.warn('⚠️ Could not find original item for:', classified.name);
+          return null;
+        }
+
         return {
           ...originalItem,
           category: classified.category,
           confidence: classified.confidence
         };
-      });
+      }).filter((item: any) => item !== null);
 
       const nonCookable = classificationData.non_cookable.map((classified: any) => {
         const originalItem = items.find(item => 
           this.normalizeItemName(item.name) === this.normalizeItemName(classified.name)
         );
+        // Skip if original item not found
+        if (!originalItem) {
+          console.warn('⚠️ Could not find original item for:', classified.name);
+          return null;
+        }
+        
         return {
           ...originalItem,
           category: classified.category,
           confidence: classified.confidence
         };
-      });
+      }).filter((item: any) => item !== null);
       
       return { cookable, nonCookable };
       
