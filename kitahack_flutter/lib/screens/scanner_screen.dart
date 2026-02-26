@@ -38,8 +38,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       await supabase.storage.from('receipts').uploadBinary(
         path,
         imageBytes,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        fileOptions: const FileOptions(cacheControl: '3600', upsert: false, contentType: 'image/jpeg',),
       );
+
+      final String fullImageUrl = supabase.storage.from('receipts').getPublicUrl(path);
 
       // 2. Create Receipt Record with 'pending' status
       await supabase.from('receipts').insert({
@@ -51,11 +53,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
       // 3. Trigger OCR Edge Function
       final response = await supabase.functions.invoke(
         'ocr', 
-        body: {'imagePath': path}
+        body: {'image_url': fullImageUrl}
       );
 
       setState(() {
-        _ocrResult = response.data['text'] ?? "Processing completed, but no text returned.";
+        _ocrResult = response.data['raw_text'] ?? "Processing completed, but no text returned.";
       });
 
     // ✅ FIXED CATCH BLOCKS: Proper Dart syntax
@@ -156,12 +158,68 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade300),
                     ),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _ocrResult,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
+                    child: _ocrResult == "No receipt scanned yet." 
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long, size: 80, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text("Ready to scan your grocery receipt.", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                              ],
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
+                                    SizedBox(width: 8),
+                                    Text("AI Analysis Complete", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF2E7D32))),
+                                  ],
+                                ),
+                                const Divider(height: 24, thickness: 2),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5, spreadRadius: 1)
+                                    ],
+                                    border: Border.all(color: Colors.grey.shade200) // 模仿收据纸张边缘
+                                  ),
+                                  child: Text(
+                                    _ocrResult,
+                                    style: const TextStyle(
+                                      fontFamily: 'Courier', // 用打字机字体更有收据的感觉
+                                      fontSize: 15,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                // 🌟 新增：准备前往 Dashboard 的按钮
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    // TODO: 跳转到 Dashboard 并传递数据
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Items successfully added to your Kitchen Inventory! 🥦')),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.inventory_2),
+                                  label: const Text("Confirm & Add to Inventory"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange.shade600,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                )
+                              ],
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 24),
