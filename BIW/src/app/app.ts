@@ -109,7 +109,69 @@ import { OcrService } from './services/ocr.service';
 
       <hr style="margin: 30px 0;">
 
-      <!-- View Receipts -->
+      <!-- Meal Recommendations & Expiry Alerts -->
+      <div style="margin: 20px 0;">
+        <h3>🍽️ Meal Recommendations & Alerts</h3>
+        <button 
+          (click)="testMealRecommendations()" 
+          [disabled]="mealLoading"
+          style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+          {{ mealLoading ? '⏳ Loading...' : '🍳 Get Meal Recommendations' }}
+        </button>
+        
+        <button 
+          (click)="testExpiryAlerts()" 
+          [disabled]="expiryLoading"
+          style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          {{ expiryLoading ? '⏳ Checking...' : '⏰ Check Expiry Alerts' }}
+        </button>
+
+        @if (mealResults) {
+          <div style="margin-top: 15px; padding: 15px; background: #f0fdf4; border-radius: 4px; border-left: 4px solid #10b981;">
+            <h4>🍳 Meal Recommendations ({{ mealResults.length }})</h4>
+            @for (meal of mealResults; track meal.id) {
+              <div style="padding: 10px; margin: 10px 0; background: white; border-radius: 4px;">
+                <strong>{{ meal.meal.name }}</strong>
+                <p style="margin: 5px 0;">{{ meal.meal.description }}</p>
+                <small style="color: #666;">
+                  Match: {{ meal.match_score }}% | 
+                  {{ meal.cuisine_type }} | 
+                  {{ meal.difficulty_level }} | 
+                  {{ meal.prep_time + meal.cook_time }} mins |
+                  Savings: RM {{ meal.potential_savings }}
+                </small>
+                <details style="margin-top: 5px;">
+                  <summary style="cursor: pointer; color: #10b981;">View Recipe</summary>
+                  <pre style="white-space: pre-wrap; font-size: 12px; margin: 5px 0;">{{ meal.recipe_instructions }}</pre>
+                </details>
+              </div>
+            }
+          </div>
+        }
+
+        @if (expiryResults) {
+          <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 4px; border-left: 4px solid #f59e0b;">
+            <h4>⏰ Expiry Alert Summary</h4>
+            <p><strong>Total Expiring Items:</strong> {{ expiryResults.summary?.total_expiring_items || 0 }}</p>
+            <p><strong>Users Affected:</strong> {{ expiryResults.summary?.users_affected || 0 }}</p>
+            <p><strong>Alerts Sent:</strong> {{ expiryResults.summary?.alerts_sent || 0 }}</p>
+            @if (expiryResults.alerts && expiryResults.alerts.length > 0) {
+              <div style="margin-top: 10px;">
+                @for (alert of expiryResults.alerts; track $index) {
+                  <div style="padding: 10px; margin: 5px 0; background: white; border-radius: 4px;">
+                    <p>{{ alert.message }}</p>
+                    <small style="color: #666;">{{ alert.item_count }} items ({{ alert.urgent_count }} urgent)</small>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <hr style="margin: 30px 0;">
+
+      <!-- View Receipts (removed the loadReceipts section as you mentioned) -->
       <div style="margin: 20px 0;">
         <h3>📋 My Receipts</h3>
         @if (!isAuthenticated) {
@@ -190,6 +252,12 @@ export class App implements OnInit {
   
   receipts: any[] = [];
   loadingReceipts = false;
+
+  // Meal recommendations & expiry alerts
+  mealLoading = false;
+  expiryLoading = false;
+  mealResults: any[] | null = null;
+  expiryResults: any = null;
 
   constructor(
     private gemini: GeminiService,
@@ -381,4 +449,52 @@ export class App implements OnInit {
       alert(`Receipt Details:\n\nStore: ${receipt.store_name}\nTotal: ${receipt.currency} ${receipt.total_amount}\nStatus: ${receipt.processing_status}\n\nCheck console for full details.`);
     }
   }
+
+  // ============================================
+  // MEAL RECOMMENDATIONS & EXPIRY ALERTS
+  // ============================================
+
+async testMealRecommendations() {
+  this.mealLoading = true;
+  this.mealResults = null;
+  
+  try {
+    console.log('🍳 Testing meal recommendations...');
+    // Call edge function directly
+    const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
+      body: { max_meals: 3 }
+    });
+    
+    if (error) throw error;
+    
+    this.mealResults = data.recommendations || [];
+    console.log('✅ Meal recommendations:', this.mealResults);
+  } catch (error: any) {
+    console.error('❌ Meal recommendation error:', error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    this.mealLoading = false;
+  }
+}
+
+async testExpiryAlerts() {
+  this.expiryLoading = true;
+  this.expiryResults = null;
+  
+  try {
+    console.log('⏰ Testing expiry alerts...');
+    // Call the edge function directly via Supabase client
+    const { data, error } = await this.supabase.client.functions.invoke('expiry-alerts');
+    
+    if (error) throw error;
+    
+    this.expiryResults = data;
+    console.log('✅ Expiry alerts:', this.expiryResults);
+  } catch (error: any) {
+    console.error('❌ Expiry alert error:', error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    this.expiryLoading = false;
+  }
+}
 }

@@ -15,3 +15,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/classify-items/deno.json"
 entrypoint = "./functions/classify-items/index.ts"
+
+[functions.meal-recommendation]
+enabled = true
+verify_jwt = false
+import_map = "./functions/meal-recommendation/deno.json"
+entrypoint = "./functions/meal-recommendation/index.ts"
+
+[functions.expiry-alerts]
+verify_jwt = false 
