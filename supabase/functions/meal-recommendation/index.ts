@@ -17,6 +17,14 @@ serve(async (req) => {
     
     // Auth validation
     const authHeader = req.headers.get('Authorization')
+    const masterKey = req.headers.get('x-hackathon-key');
+
+    if (masterKey === "my-secret-demo-key") {
+    // Hardcode a test user ID for the demo so inventory queries still work
+    var user = { id: '00000000-0000-0000-0000-000000000000' }; 
+    } else if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Missing Authorization' }), { status: 401 });
+    }
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' }),
