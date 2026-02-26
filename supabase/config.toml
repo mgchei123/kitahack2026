@@ -1,6 +1,6 @@
 [functions.ocr]
-enabled = false
-verify_jwt = true
+enabled = true
+verify_jwt = false
 import_map = "./functions/ocr/deno.json"
 entrypoint = "./functions/ocr/index.ts"
 
