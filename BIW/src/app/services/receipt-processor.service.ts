@@ -283,6 +283,14 @@ export class ReceiptProcessorService {
     const purchase = new Date(purchaseDate);
     let daysUntilExpiry = 7;
 
+      // Add null/undefined check
+  if (!itemName) {
+    console.warn('⚠️ Missing item name, using default expiry');
+    const expiryDate = new Date(purchase);
+    expiryDate.setDate(expiryDate.getDate() + 30);
+    return expiryDate.toISOString().split('T')[0];
+  }
+
     const expiryMap: { [key: string]: number } = {
       'protein': 3,
       'dairy': 7,
