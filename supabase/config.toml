@@ -1,6 +1,6 @@
 [functions.ocr]
-enabled = false
-verify_jwt = true
+enabled = true
+verify_jwt = false
 import_map = "./functions/ocr/deno.json"
 entrypoint = "./functions/ocr/index.ts"
 
@@ -15,3 +15,33 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/classify-items/deno.json"
 entrypoint = "./functions/classify-items/index.ts"
+
+[functions.meal-recommendation]
+enabled = true
+verify_jwt = false
+import_map = "./functions/meal-recommendation/deno.json"
+entrypoint = "./functions/meal-recommendation/index.ts"
+
+[functions.expiry-alerts]
+enabled = true
+verify_jwt = false
+import_map = "./functions/expiry-alerts/deno.json"
+entrypoint = "./functions/expiry-alerts/index.ts"
+
+[functions.ingredient-usage-history]
+enabled = true
+verify_jwt = false
+import_map = "./functions/ingredient-usage-history/deno.json"
+entrypoint = "./functions/ingredient-usage-history/index.ts"
+
+[functions.get-usage-history]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-usage-history/deno.json"
+entrypoint = "./functions/get-usage-history/index.ts"
+
+[functions.update-meal-rating]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-meal-rating/deno.json"
+entrypoint = "./functions/update-meal-rating/index.ts"
