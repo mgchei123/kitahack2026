@@ -23,4 +23,25 @@ import_map = "./functions/meal-recommendation/deno.json"
 entrypoint = "./functions/meal-recommendation/index.ts"
 
 [functions.expiry-alerts]
-verify_jwt = false 
+enabled = true
+verify_jwt = false
+import_map = "./functions/expiry-alerts/deno.json"
+entrypoint = "./functions/expiry-alerts/index.ts"
+
+[functions.ingredient-usage-history]
+enabled = true
+verify_jwt = false
+import_map = "./functions/ingredient-usage-history/deno.json"
+entrypoint = "./functions/ingredient-usage-history/index.ts"
+
+[functions.get-usage-history]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-usage-history/deno.json"
+entrypoint = "./functions/get-usage-history/index.ts"
+
+[functions.update-meal-rating]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-meal-rating/deno.json"
+entrypoint = "./functions/update-meal-rating/index.ts"
