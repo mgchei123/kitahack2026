@@ -1,21 +1,17 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms'; 
-import { GeminiService } from './services/gemini';
+import { FormsModule } from '@angular/forms';
 import { SupabaseService } from './services/supabase.service';
-import { ReceiptService } from './services/receipt.service';
-import { MealService } from './services/meal.service';
-import { AuthService } from './services/auth.service'; 
 import { ReceiptProcessorService } from './services/receipt-processor.service';
+import { ReceiptService } from './services/receipt.service';
 import { InventoryService } from './services/inventory.service';
-import { OcrService } from './services/ocr.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule], 
+  imports: [CommonModule, FormsModule],
   template: `
-    <div style="padding: 20px; font-family: sans-serif; max-width: 800px; margin: 0 auto;">
+    <div style="padding: 20px; font-family: sans-serif; max-width: 1200px; margin: 0 auto;">
       <h1>🚀 Supabase + Gemini Dashboard</h1>
 
       <!-- Auth Status -->
@@ -109,6 +105,163 @@ import { OcrService } from './services/ocr.service';
 
       <hr style="margin: 30px 0;">
 
+      <!-- Manual Food Addition Section -->
+      <div style="margin: 20px 0;">
+        <h3>🍎 Manual Food Addition</h3>
+        @if (!isAuthenticated) {
+          <p style="color: #ef4444;">⚠️ Please sign in first to add food manually</p>
+        }
+        @if (isAuthenticated) {
+          <button 
+            (click)="toggleManualFoodForm()" 
+            style="padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">
+            {{ showManualFoodForm ? '❌ Cancel' : '➕ Add Food Manually' }}
+          </button>
+
+          @if (showManualFoodForm) {
+            <div style="padding: 20px; background: #f3f4f6; border-radius: 8px; border: 2px solid #8b5cf6;">
+              <h4>Add Ingredient</h4>
+              
+              <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ingredient Name *</label>
+                <input 
+                  [(ngModel)]="manualFoodForm.ingredient_name"
+                  type="text" 
+                  placeholder="e.g., Tomatoes, Chicken Breast, Rice"
+                  style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Quantity *</label>
+                  <input 
+                    [(ngModel)]="manualFoodForm.quantity"
+                    type="number" 
+                    min="0.1"
+                    step="0.1"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
+                </div>
+
+                <div>
+                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Unit *</label>
+                  <select 
+                    [(ngModel)]="manualFoodForm.unit"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
+                    <option value="pieces">Pieces</option>
+                    <option value="kg">Kilograms (kg)</option>
+                    <option value="g">Grams (g)</option>
+                    <option value="l">Liters (l)</option>
+                    <option value="ml">Milliliters (ml)</option>
+                    <option value="cups">Cups</option>
+                    <option value="tbsp">Tablespoons</option>
+                    <option value="tsp">Teaspoons</option>
+                    <option value="pack">Pack</option>
+                    <option value="bottle">Bottle</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Category</label>
+                  <select 
+                    [(ngModel)]="manualFoodForm.category"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
+                    <option value="">Select Category</option>
+                    <option value="vegetable">Vegetable</option>
+                    <option value="fruit">Fruit</option>
+                    <option value="protein">Protein (Meat/Fish)</option>
+                    <option value="dairy">Dairy</option>
+                    <option value="grain">Grain/Rice/Pasta</option>
+                    <option value="spice">Spice/Seasoning</option>
+                    <option value="canned">Canned Goods</option>
+                    <option value="frozen">Frozen</option>
+                    <option value="beverage">Beverage</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Expiry Date</label>
+                  <input 
+                    [(ngModel)]="manualFoodForm.expiry_date"
+                    type="date" 
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
+                </div>
+              </div>
+
+              <button 
+                (click)="addManualFood()"
+                [disabled]="addingManualFood || !manualFoodForm.ingredient_name"
+                style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">
+                {{ addingManualFood ? '⏳ Adding...' : '✅ Add to Inventory' }}
+              </button>
+
+              @if (manualFoodStatus) {
+                <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px; text-align: center;">
+                  {{ manualFoodStatus }}
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <hr style="margin: 30px 0;">
+
+      <!-- View Inventory Section -->
+      <div style="margin: 20px 0;">
+        <h3>📦 Your Inventory</h3>
+        @if (!isAuthenticated) {
+          <p style="color: #ef4444;">⚠️ Please sign in to view inventory</p>
+        }
+        @if (isAuthenticated) {
+          <button 
+            (click)="loadInventory()" 
+            [disabled]="loadingInventory"
+            style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">
+            {{ loadingInventory ? '⏳ Loading...' : '🔄 Refresh Inventory' }}
+          </button>
+
+          @if (loadingInventory) {
+            <div style="padding: 20px; text-align: center;">Loading inventory...</div>
+          } @else if (userInventory.length === 0) {
+            <div style="padding: 20px; background: #f3f4f6; border-radius: 4px; text-align: center;">
+              <p>No items in inventory yet. Add items manually or scan a receipt!</p>
+            </div>
+          } @else {
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
+              @for (item of userInventory; track item.id) {
+                <div style="padding: 15px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                    <strong style="color: #1f2937; font-size: 16px;">{{ item.ingredient_name }}</strong>
+                    <button 
+                      (click)="deleteInventoryItem(item.id)"
+                      style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">
+                      🗑️
+                    </button>
+                  </div>
+                  <div style="color: #6b7280; font-size: 14px;">
+                    <p style="margin: 5px 0;">📊 {{ item.quantity }} {{ item.unit }}</p>
+                    <p style="margin: 5px 0;">🏷️ {{ item.category || 'N/A' }}</p>
+                    @if (item.expiry_date) {
+                      <p style="margin: 5px 0; color: #f59e0b;">⏰ Expires: {{ item.expiry_date | date:'shortDate' }}</p>
+                    }
+                    <p style="margin: 5px 0; font-size: 12px;">
+                      <span [style.color]="item.source === 'receipt' ? '#10b981' : '#8b5cf6'">
+                        {{ item.source === 'receipt' ? '🧾 From Receipt' : '✍️ Manual Entry' }}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <hr style="margin: 30px 0;">
+
       <!-- Meal Recommendations & Expiry Alerts -->
       <div style="margin: 20px 0;">
         <h3>🍽️ Meal Recommendations & Alerts</h3>
@@ -171,7 +324,7 @@ import { OcrService } from './services/ocr.service';
 
       <hr style="margin: 30px 0;">
 
-      <!-- View Receipts (removed the loadReceipts section as you mentioned) -->
+      <!-- View Receipts -->
       <div style="margin: 20px 0;">
         <h3>📋 My Receipts</h3>
         @if (!isAuthenticated) {
@@ -236,63 +389,59 @@ import { OcrService } from './services/ocr.service';
   `
 })
 export class App implements OnInit {
+  // Auth properties
   authStatus = 'Not authenticated';
   isAuthenticated = false;
-  
-  // Email auth form
   showEmailAuth = false;
   email = '';
   password = '';
   authLoading = false;
   authError = '';
-  
+
+  // Receipt upload properties
   selectedFile: File | null = null;
   uploadLoading = false;
   uploadStatus = 'No file selected';
-  
+
+  // Receipt list properties
   receipts: any[] = [];
   loadingReceipts = false;
 
-  // Meal recommendations & expiry alerts
+  // Meal recommendation properties
   mealLoading = false;
-  expiryLoading = false;
   mealResults: any[] | null = null;
+
+  // Expiry alert properties
+  expiryLoading = false;
   expiryResults: any = null;
 
+  // Manual food addition properties
+  showManualFoodForm = false;
+  manualFoodForm = {
+    ingredient_name: '',
+    quantity: 1,
+    unit: 'pieces',
+    category: '',
+    expiry_date: ''
+  };
+  addingManualFood = false;
+  manualFoodStatus = '';
+  
+  // Inventory display properties
+  userInventory: any[] = [];
+  loadingInventory = false;
+
   constructor(
-    private gemini: GeminiService,
-    private supabase: SupabaseService,
+    public supabase: SupabaseService,
+    private receiptProcessor: ReceiptProcessorService,
     private receiptService: ReceiptService,
-    private mealService: MealService,
-    private auth: AuthService,
-    private receiptProcessor: ReceiptProcessorService,  
-    private inventory: InventoryService,
-    private ocr: OcrService
-  ) {
-    // Expose services to window for debugging
-    (window as any).backend = {
-      gemini: this.gemini,
-      supabase: this.supabase,
-      receipt: this.receiptService,
-      meal: this.mealService,
-      auth: this.auth,
-      processor: this.receiptProcessor,
-      inventory: this.inventory,
-      ocr: this.ocr
-    };
-    console.log('✅ Access backend services via: window.backend');
-  }
+    private inventoryService: InventoryService
+  ) {}
 
   ngOnInit() {
-    this.supabase.user$.subscribe((user: any) => {
-      if (user) {
-        this.authStatus = `✅ Authenticated as ${user.email || user.id.substring(0, 8) + '...'}`;
-        this.isAuthenticated = true;
-      } else {
-        this.authStatus = '❌ Not authenticated';
-        this.isAuthenticated = false;
-        this.receipts = [];
-      }
+    this.supabase.user$.subscribe(user => {
+      this.isAuthenticated = !!user;
+      this.authStatus = user ? `✅ Signed in as ${user.email || 'Anonymous User'}` : '❌ Not authenticated';
     });
   }
 
@@ -301,99 +450,66 @@ export class App implements OnInit {
   // ============================================
 
   async signInAnonymously() {
+    this.authLoading = true;
+    this.authError = '';
     try {
-      this.authStatus = '⏳ Signing in anonymously...';
-      const user = await this.auth.signInAnonymously();
+      const user = await this.supabase.signInAnonymously();
       if (user) {
-        this.authStatus = `✅ Signed in anonymously as ${user.id.substring(0, 8)}...`;
-        this.isAuthenticated = true;
-      } else {
-        this.authStatus = '❌ Anonymous sign in failed';
+        this.authStatus = '✅ Signed in anonymously';
+        console.log('✅ Anonymous sign-in successful');
       }
     } catch (error: any) {
-      this.authStatus = `❌ Error: ${error.message}`;
-      console.error('Anonymous sign in error:', error);
+      this.authError = error.message;
+      console.error('❌ Sign-in error:', error);
+    } finally {
+      this.authLoading = false;
     }
   }
 
   async signInWithEmail() {
-    if (!this.email || !this.password) {
-      this.authError = 'Please enter email and password';
-      return;
-    }
-
     this.authLoading = true;
     this.authError = '';
-    
     try {
-      const user = await this.auth.signInWithEmail(this.email, this.password);
-      if (user) {
-        this.authStatus = `✅ Signed in as ${user.email}`;
-        this.isAuthenticated = true;
-        this.showEmailAuth = false;
-        this.email = '';
-        this.password = '';
-      }
+      const { error } = await this.supabase.signIn(this.email, this.password);
+      if (error) throw error;
+      this.showEmailAuth = false;
     } catch (error: any) {
       this.authError = error.message;
-      console.error('Sign in error:', error);
     } finally {
       this.authLoading = false;
     }
   }
 
   async signUpWithEmail() {
-    if (!this.email || !this.password) {
-      this.authError = 'Please enter email and password';
-      return;
-    }
-
-    if (this.password.length < 6) {
-      this.authError = 'Password must be at least 6 characters';
-      return;
-    }
-
     this.authLoading = true;
     this.authError = '';
-    
     try {
-      const user = await this.auth.signUp(this.email, this.password);
-      if (user) {
-        this.authStatus = `✅ Account created! Signed in as ${user.email}`;
-        this.isAuthenticated = true;
-        this.showEmailAuth = false;
-        this.email = '';
-        this.password = '';
-      }
+      const { error } = await this.supabase.signUp(this.email, this.password);
+      if (error) throw error;
+      this.authError = '✅ Check your email for confirmation link!';
     } catch (error: any) {
       this.authError = error.message;
-      console.error('Sign up error:', error);
     } finally {
       this.authLoading = false;
     }
   }
 
   async signOut() {
-    try {
-      await this.auth.signOut();
-      this.authStatus = '✅ Signed out successfully';
-      this.isAuthenticated = false;
-      this.receipts = [];
-    } catch (error: any) {
-      this.authStatus = `❌ Sign out error: ${error.message}`;
-      console.error('Sign out error:', error);
-    }
+    await this.supabase.signOut();
+    this.authStatus = '❌ Signed out';
+    this.receipts = [];
+    this.userInventory = [];
   }
 
   // ============================================
-  // RECEIPT METHODS
+  // RECEIPT UPLOAD METHODS
   // ============================================
 
   onFileSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
       this.selectedFile = file;
-      this.uploadStatus = `Selected: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+      this.uploadStatus = `📁 File selected: ${file.name}`;
       console.log('📁 File selected:', file.name);
     }
   }
@@ -410,16 +526,14 @@ export class App implements OnInit {
     try {
       console.log('🚀 Starting receipt processing...');
       
-      // Process receipt through the full pipeline
       const receiptId = await this.receiptProcessor.processReceiptFull(this.selectedFile);
       
       this.uploadStatus = `✅ Receipt processed successfully! ID: ${receiptId}`;
       console.log('✅ Receipt processing complete:', receiptId);
       
-      // Refresh receipts list
       await this.loadReceipts();
+      await this.loadInventory();
       
-      // Reset file input
       this.selectedFile = null;
       
     } catch (error: any) {
@@ -451,50 +565,146 @@ export class App implements OnInit {
   }
 
   // ============================================
+  // MANUAL FOOD ADDITION
+  // ============================================
+
+  toggleManualFoodForm() {
+    this.showManualFoodForm = !this.showManualFoodForm;
+    if (this.showManualFoodForm) {
+      this.manualFoodForm = {
+        ingredient_name: '',
+        quantity: 1,
+        unit: 'pieces',
+        category: '',
+        expiry_date: ''
+      };
+      this.manualFoodStatus = '';
+    }
+  }
+
+  async addManualFood() {
+    if (!this.manualFoodForm.ingredient_name.trim()) {
+      this.manualFoodStatus = '❌ Please enter an ingredient name';
+      return;
+    }
+
+    this.addingManualFood = true;
+    this.manualFoodStatus = '⏳ Adding ingredient...';
+
+    try {
+      const session = await this.supabase.client.auth.getSession();
+      if (!session.data.session) {
+        await this.supabase.signInAnonymously();
+      }
+
+      await this.inventoryService.addManualIngredient({
+        ingredient_name: this.manualFoodForm.ingredient_name.trim(),
+        quantity: this.manualFoodForm.quantity,
+        unit: this.manualFoodForm.unit,
+        category: this.manualFoodForm.category || 'other',
+        expiry_date: this.manualFoodForm.expiry_date || undefined,
+        source: 'manual_entry',
+        is_available: true
+      });
+
+      this.manualFoodStatus = '✅ Ingredient added successfully!';
+      console.log('✅ Manual ingredient added:', this.manualFoodForm.ingredient_name);
+
+      this.manualFoodForm = {
+        ingredient_name: '',
+        quantity: 1,
+        unit: 'pieces',
+        category: '',
+        expiry_date: ''
+      };
+
+      await this.loadInventory();
+
+      setTimeout(() => {
+        this.showManualFoodForm = false;
+      }, 2000);
+
+    } catch (error: any) {
+      this.manualFoodStatus = `❌ Error: ${error.message}`;
+      console.error('❌ Failed to add manual ingredient:', error);
+    } finally {
+      this.addingManualFood = false;
+    }
+  }
+
+  async loadInventory() {
+    this.loadingInventory = true;
+    try {
+      this.userInventory = await this.inventoryService.getAvailableIngredients();
+      console.log(`📦 Loaded ${this.userInventory.length} inventory items`);
+    } catch (error: any) {
+      console.error('❌ Error loading inventory:', error);
+    } finally {
+      this.loadingInventory = false;
+    }
+  }
+
+  async deleteInventoryItem(itemId: string) {
+    if (!confirm('Are you sure you want to delete this item?')) {
+      return;
+    }
+
+    try {
+      await this.inventoryService.updateIngredientQuantity(itemId, 0);
+      await this.loadInventory();
+      console.log('✅ Item deleted');
+    } catch (error: any) {
+      console.error('❌ Error deleting item:', error);
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  // ============================================
   // MEAL RECOMMENDATIONS & EXPIRY ALERTS
   // ============================================
 
-async testMealRecommendations() {
-  this.mealLoading = true;
-  this.mealResults = null;
-  
-  try {
-    console.log('🍳 Testing meal recommendations...');
-    // Call edge function directly
-    const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
-      body: { max_meals: 3 }
-    });
+  async testMealRecommendations() {
+    this.mealLoading = true;
+    this.mealResults = null;
     
-    if (error) throw error;
-    
-    this.mealResults = data.recommendations || [];
-    console.log('✅ Meal recommendations:', this.mealResults);
-  } catch (error: any) {
-    console.error('❌ Meal recommendation error:', error);
-    alert(`Error: ${error.message}`);
-  } finally {
-    this.mealLoading = false;
+    try {
+      console.log('🍳 Testing meal recommendations...');
+      const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
+        headers: {
+          'x-hackathon-key': 'my-secret-demo-key'
+        },
+        body: { max_meals: 3 }
+      });
+      
+      if (error) throw error;
+      
+      this.mealResults = data.recommendations || [];
+      console.log('✅ Meal recommendations:', this.mealResults);
+    } catch (error: any) {
+      console.error('❌ Meal recommendation error:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      this.mealLoading = false;
+    }
   }
-}
 
-async testExpiryAlerts() {
-  this.expiryLoading = true;
-  this.expiryResults = null;
-  
-  try {
-    console.log('⏰ Testing expiry alerts...');
-    // Call the edge function directly via Supabase client
-    const { data, error } = await this.supabase.client.functions.invoke('expiry-alerts');
+  async testExpiryAlerts() {
+    this.expiryLoading = true;
+    this.expiryResults = null;
     
-    if (error) throw error;
-    
-    this.expiryResults = data;
-    console.log('✅ Expiry alerts:', this.expiryResults);
-  } catch (error: any) {
-    console.error('❌ Expiry alert error:', error);
-    alert(`Error: ${error.message}`);
-  } finally {
-    this.expiryLoading = false;
+    try {
+      console.log('⏰ Testing expiry alerts...');
+      const { data, error } = await this.supabase.client.functions.invoke('expiry-alerts');
+      
+      if (error) throw error;
+      
+      this.expiryResults = data;
+      console.log('✅ Expiry alerts:', this.expiryResults);
+    } catch (error: any) {
+      console.error('❌ Expiry alert error:', error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      this.expiryLoading = false;
+    }
   }
-}
 }
