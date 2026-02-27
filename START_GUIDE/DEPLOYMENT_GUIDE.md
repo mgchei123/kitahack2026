@@ -228,11 +228,7 @@ export const environment = {
   },
   geminiApiKey: "${GEMINI_API_KEY}",
    
-  ai: {
-    ocrEndpoint: '${SUPABASE_URL}/functions/v1/ocr',
-    classificationEndpoint: '${SUPABASE_URL}/functions/v1/classify-items',
-    mealRecommendationEndpoint: '${SUPABASE_URL}/functions/v1/meal-recommendation'
-  }
+
 };
 EOF
 
