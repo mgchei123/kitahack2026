@@ -21,10 +21,10 @@ export interface Receipt {
   processed: boolean;
   created_at?: string;
   // New fields from updated schema
-  items_raw?: any[];
+  items_raw?: any;
   cookable_items?: any[];
   non_cookable_items?: any[];
-  processing_status?: 'pending' | 'processing' | 'completed' | 'failed';
+  processing_status?: 'pending' | 'processing' | 'ocr_completed' | 'completed' | 'failed';
   error_message?: string;
   updated_at?: string;
 }
@@ -210,7 +210,7 @@ export class ReceiptService {
    */
   async updateReceiptStatus(
     receiptId: string, 
-    status: 'pending' | 'processing' | 'completed' | 'failed',
+    status: 'pending' | 'processing' | 'ocr_completed' | 'completed' | 'failed',
     errorMessage?: string
   ): Promise<void> {
     try {
@@ -232,6 +232,37 @@ export class ReceiptService {
       console.log(`✅ Receipt ${receiptId} status: ${status}`);
     } catch (error) {
       console.error('❌ Error updating receipt status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save OCR result to receipts table
+   */
+  async saveOCRResult(
+    receiptId: string,
+    rawText: string,
+    confidence: number,
+    model: string = 'gemini-2.5-flash'
+  ): Promise<void> {
+    try {
+      const { error } = await this.supabase.client
+        .from('receipts')
+        .update({
+          items_raw: {
+            raw_text: rawText,
+            confidence: confidence,
+            model: model
+          },
+          processing_status: 'ocr_completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', receiptId);
+
+      if (error) throw error;
+      console.log('✅ OCR result saved to database');
+    } catch (error) {
+      console.error('❌ Error saving OCR result:', error);
       throw error;
     }
   }

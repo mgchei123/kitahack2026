@@ -2,50 +2,56 @@ import { Injectable } from '@angular/core';
 import { GeminiService } from './gemini';
 import { ReceiptService } from './receipt.service';
 import { InventoryService } from './inventory.service';
+import { SupabaseService } from './supabase.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ReceiptProcessorService {
   
-  // ⚙️ CONFIGURATION - Change this to switch between mock and real AI
-  private USE_MOCK_DATA = true; // Set to FALSE when AI Engineer's endpoints are ready
+  private USE_MOCK_DATA = false;
+  
+  private get OCR_ENDPOINT(): string {
+    return `${this.supabase.getSupabaseUrl()}/functions/v1/ocr`;
+  }
+  
+  private get PARSE_ENDPOINT(): string {
+    return `${this.supabase.getSupabaseUrl()}/functions/v1/parse-receipt`;
+  }
+  
+  private get CLASSIFY_ENDPOINT(): string {
+    return `${this.supabase.getSupabaseUrl()}/functions/v1/classify-items`;
+  }
   
   constructor(
     private gemini: GeminiService,
     private receiptService: ReceiptService,
-    private inventoryService: InventoryService
+    private inventoryService: InventoryService,
+    private supabase: SupabaseService
   ) {}
 
-  /**
-   * Full pipeline: Upload → OCR → Parse → Classify → Save
-   */
   async processReceiptFull(file: File): Promise<string> {
     let receiptId: string = '';
     
     try {
-      // Step 1: Upload image
       console.log('📤 Step 1: Uploading image...');
       const { receiptId: id, imageUrl } = await this.receiptService.uploadReceipt(file, {
         processing_status: 'processing'
       });
       receiptId = id;
 
-      // Step 2: Extract text with OCR
       console.log('🔍 Step 2: Extracting text from receipt...');
       const ocrText = await this.callOCRService(imageUrl);
       
-      // Step 3: Parse receipt data
       console.log('🤖 Step 3: Parsing receipt data...');
       const parsedData = await this.parseReceiptWithAI(ocrText);
       console.log('✅ Parsed data:', parsedData);
 
-      // Step 4: Classify items
       console.log('🏷️ Step 4: Classifying items...');
       const { cookable, nonCookable } = await this.classifyItems(parsedData.items);
       console.log(`✅ Classified: ${cookable.length} cookable, ${nonCookable.length} non-cookable`);
 
-      // Step 5: Save results to database
       console.log('💾 Step 5: Saving to database...');
       await this.receiptService.saveAIProcessingResults(
         receiptId,
@@ -53,12 +59,21 @@ export class ReceiptProcessorService {
         cookable,
         nonCookable
       );
-      await this.receiptService.updateReceiptStatus(receiptId, 'completed');
+      
+      await this.supabase.client
+        .from('receipts')
+        .update({
+          store_name: parsedData.store_name,
+          purchase_date: parsedData.purchase_date,
+          total_amount: parsedData.total_amount,
+          currency: parsedData.currency,
+          processing_status: 'completed'
+        })
+        .eq('id', receiptId);
 
-      // Step 6: Add cookable items to inventory
       console.log('📦 Step 6: Adding to inventory...');
       if (cookable && cookable.length > 0) {
-        await this.inventoryService.addIngredientsFromReceipt(receiptId, cookable);
+        await this.addToInventoryWithExpiry(receiptId, cookable, parsedData.purchase_date);
       }
 
       console.log('✅ Receipt processing complete!');
@@ -80,292 +95,284 @@ export class ReceiptProcessorService {
   }
 
   /**
-   * Call OCR service
-   * 🔄 CHANGE THIS: When AI Engineer provides OCR endpoint, update the real implementation
+   * ✅ FIXED: Call OCR service with both Authorization AND apikey headers
    */
   private async callOCRService(imageUrl: string): Promise<string> {
     if (this.USE_MOCK_DATA) {
-      // MOCK DATA - Using hardcoded receipt text
       console.log('🎭 Using MOCK OCR');
       await this.delay(500);
       return this.getMockReceiptText();
     }
     
-    // 🔄 REAL IMPLEMENTATION - Uncomment and update when AI Engineer provides endpoint
-    /*
     try {
-      const response = await fetch('YOUR_AI_ENGINEER_OCR_ENDPOINT', {
+      const session = await this.supabase.client.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        throw new Error('Not authenticated - please sign in');
+      }
+
+      // ✅ DEBUG: Log what we're sending
+      console.log('📞 Calling OCR endpoint:', this.OCR_ENDPOINT);
+      console.log('🔑 Token exists:', !!token);
+      console.log('🔑 Anon key exists:', !!environment.supabase?.anonKey);
+      console.log('🔑 First 20 chars of anon key:', environment.supabase?.anonKey?.substring(0, 20));
+
+      const response = await fetch(this.OCR_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': environment.supabase.anonKey  // ⬅️ THIS IS THE KEY FIX!
+        },
         body: JSON.stringify({ image_url: imageUrl })
       });
       
-      if (!response.ok) throw new Error('OCR API failed');
+      console.log('📡 OCR Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ OCR Error Response:', errorData);
+        throw new Error(errorData.error || `OCR API failed: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log('✅ OCR confidence:', data.confidence);
       return data.raw_text;
-    } catch (error) {
-      console.error('OCR API error:', error);
-      throw new Error('Failed to extract text from receipt');
+      
+    } catch (error: any) {
+      console.error('❌ OCR API error:', error);
+      throw new Error(`Failed to extract text from receipt: ${error.message}`);
     }
-    */
-    
-    // Fallback to Gemini (temporary)
-    const prompt = `Extract ALL text from this receipt image. Return the raw text exactly as it appears.`;
-    return await this.gemini.generateText(prompt);
   }
 
   /**
-   * Parse receipt text to structured data
-   * 🔄 CHANGE THIS: When AI Engineer provides parsing endpoint, update the real implementation
+   * ✅ FIXED: Parse receipt with both Authorization AND apikey headers
    */
   private async parseReceiptWithAI(ocrText: string): Promise<any> {
     if (this.USE_MOCK_DATA) {
-      // MOCK DATA - Using hardcoded parsed data
       console.log('🎭 Using MOCK Parsing');
       await this.delay(500);
       return this.getMockParsedData();
     }
 
-    // 🔄 REAL IMPLEMENTATION - Using Gemini or AI Engineer's endpoint
     try {
-      const prompt = `
-Parse this receipt text and extract structured data. Return ONLY valid JSON, no markdown formatting.
+      const session = await this.supabase.client.auth.getSession();
+      const token = session.data.session?.access_token;
 
-Receipt text:
-${ocrText}
+      if (!token) {
+        throw new Error('Not authenticated - please sign in');
+      }
 
-Return this exact JSON structure:
-{
-  "store_name": "store name here",
-  "purchase_date": "YYYY-MM-DD",
-  "total_amount": 0.00,
-  "currency": "MYR",
-  "items": [
-    {"name": "item name", "quantity": 1, "unit": "unit", "price": 0.00}
-  ]
-}
-`;
+      console.log('📞 Calling Parse endpoint:', this.PARSE_ENDPOINT);
 
-      const response = await this.gemini.generateText(prompt);
-      console.log('🤖 Gemini parsing response:', response);
+      const response = await fetch(this.PARSE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': environment.supabase.anonKey  // ⬹️ THIS IS THE KEY FIX!
+        },
+        body: JSON.stringify({ ocr_text: ocrText })
+      });
       
-      // Extract JSON from response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        
-        // Validate that items array exists
-        if (!parsed.items || !Array.isArray(parsed.items)) {
-          console.warn('⚠️ Parsed data missing items array, using fallback');
-          return this.getMockParsedData();
-        }
-        
-        return parsed;
+      console.log('📡 Parse Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Parse Error Response:', errorData);
+        throw new Error(errorData.error || `Parse API failed: ${response.status}`);
       }
       
-      throw new Error('No JSON found in response');
+      const parsedData = await response.json();
       
-    } catch (error) {
-      console.error('❌ Parsing failed, using fallback data:', error);
-      return this.getMockParsedData();
+      if (!parsedData.items || !Array.isArray(parsedData.items) || parsedData.items.length === 0) {
+        throw new Error('Parsed data has no items');
+      }
+      
+      return parsedData;
+      
+    } catch (error: any) {
+      console.error('❌ Parse API error:', error);
+      throw new Error(`Failed to parse receipt: ${error.message}`);
     }
   }
 
   /**
-   * Classify items as cookable or non-cookable
-   * 🔄 CHANGE THIS: When AI Engineer provides classification endpoint, update the real implementation
+   * ✅ FIXED: Classify items with both Authorization AND apikey headers
    */
   private async classifyItems(items: any[]): Promise<{ cookable: any[]; nonCookable: any[] }> {
-    // Safety check
     if (!items || !Array.isArray(items) || items.length === 0) {
       console.warn('⚠️ No items to classify');
       return { cookable: [], nonCookable: [] };
     }
 
     if (this.USE_MOCK_DATA) {
-      // MOCK DATA - Using keyword-based classification
       console.log('🎭 Using MOCK Classification');
       await this.delay(500);
       return this.getMockClassification(items);
     }
 
-    // 🔄 REAL IMPLEMENTATION - Uncomment when AI Engineer provides endpoint
-    /*
     try {
-      const response = await fetch('YOUR_AI_ENGINEER_CLASSIFICATION_ENDPOINT', {
+      const session = await this.supabase.client.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        throw new Error('Not authenticated - please sign in');
+      }
+
+      console.log('📞 Calling Classification endpoint:', this.CLASSIFY_ENDPOINT);
+
+      const response = await fetch(this.CLASSIFY_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          items: items.map(item => item.name) 
-        })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': environment.supabase.anonKey  // ⬅️ THIS IS THE KEY FIX!
+        },
+        body: JSON.stringify({ items })
       });
       
-      if (!response.ok) throw new Error('Classification API failed');
-      
-      const data = await response.json();
-      
-      return {
-        cookable: items.filter(item => 
-          data.cookable.some((c: any) => c.name === item.name)
-        ).map(item => ({
-          ...item,
-          category: data.cookable.find((c: any) => c.name === item.name)?.category || 'other',
-          confidence: data.cookable.find((c: any) => c.name === item.name)?.confidence || 0.5
-        })),
-        nonCookable: items.filter(item => 
-          data.non_cookable.some((nc: any) => nc.name === item.name)
-        ).map(item => ({
-          ...item,
-          category: data.non_cookable.find((nc: any) => nc.name === item.name)?.category || 'other',
-          confidence: data.non_cookable.find((nc: any) => nc.name === item.name)?.confidence || 0.5
-        }))
-      };
-    } catch (error) {
-      console.error('Classification API error:', error);
-      return this.getMockClassification(items);
-    }
-    */
-
-    // Fallback to Gemini (temporary)
-    try {
-      const prompt = `
-Classify each item as either "cookable" (food/ingredients) or "non-cookable" (toiletries, household items, etc.).
-
-Items:
-${items.map(item => `- ${item.name}`).join('\n')}
-
-Return JSON:
-{
-  "cookable": ["item1", "item2"],
-  "non_cookable": ["item3", "item4"]
-}
-`;
-
-      const response = await this.gemini.generateText(prompt);
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      
-      if (jsonMatch) {
-        const classified = JSON.parse(jsonMatch[0]);
-        
-        return {
-          cookable: items.filter(item => classified.cookable.includes(item.name)),
-          nonCookable: items.filter(item => classified.non_cookable.includes(item.name))
-        };
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Classification API failed: ${response.status}`);
       }
       
-      return this.getMockClassification(items);
+      const classificationData = await response.json();
       
-    } catch (error) {
-      console.error('❌ Classification failed, using fallback:', error);
-      return this.getMockClassification(items);
+      const cookable = classificationData.cookable.map((classified: any) => {
+        const originalItem = items.find(item => 
+          this.normalizeItemName(item.name) === this.normalizeItemName(classified.name)
+        );
+
+        // Skip if original item not found
+        if (!originalItem) {
+          console.warn('⚠️ Could not find original item for:', classified.name);
+          return null;
+        }
+
+        return {
+          ...originalItem,
+          category: classified.category,
+          confidence: classified.confidence
+        };
+      }).filter((item: any) => item !== null);
+
+      const nonCookable = classificationData.non_cookable.map((classified: any) => {
+        const originalItem = items.find(item => 
+          this.normalizeItemName(item.name) === this.normalizeItemName(classified.name)
+        );
+        // Skip if original item not found
+        if (!originalItem) {
+          console.warn('⚠️ Could not find original item for:', classified.name);
+          return null;
+        }
+        
+        return {
+          ...originalItem,
+          category: classified.category,
+          confidence: classified.confidence
+        };
+      }).filter((item: any) => item !== null);
+      
+      return { cookable, nonCookable };
+      
+    } catch (error: any) {
+      console.error('❌ Classification API error:', error);
+      throw new Error(`Failed to classify items: ${error.message}`);
     }
   }
 
-  // ============================================
-  // MOCK DATA METHODS - Delete these when ready
-  // ============================================
+  private async addToInventoryWithExpiry(receiptId: string, cookableItems: any[], purchaseDate: string): Promise<void> {
+    const itemsWithExpiry = cookableItems.map(item => ({
+      ...item,
+      expiry_date: this.predictExpiryDate(item.name, item.category, purchaseDate)
+    }));
 
-  /**
-   * 🗑️ DELETE THIS: Mock OCR text
-   */
-  private getMockReceiptText(): string {
-    return `
-AEON Supermarket
-123 Jalan Main, KL
-Date: 15/02/2026
-
-Chicken Breast 500g   RM 15.50
-Rice 2kg              RM 12.00
-Onions 1kg            RM  3.50
-Soy Sauce             RM  4.20
-Garlic 200g           RM  2.50
-Cooking Oil 1L        RM  8.00
-Detergent             RM  8.90
-Shampoo               RM  9.50
-Eggs (10pcs)          RM  6.40
-
-TOTAL:                RM 75.00
-    `;
+    await this.inventoryService.addIngredientsFromReceipt(receiptId, itemsWithExpiry);
   }
 
-  /**
-   * 🗑️ DELETE THIS: Mock parsed data
-   */
+  private predictExpiryDate(itemName: string, category: string, purchaseDate: string): string {
+    const purchase = new Date(purchaseDate);
+    let daysUntilExpiry = 7;
+
+      // Add null/undefined check
+  if (!itemName) {
+    console.warn('⚠️ Missing item name, using default expiry');
+    const expiryDate = new Date(purchase);
+    expiryDate.setDate(expiryDate.getDate() + 30);
+    return expiryDate.toISOString().split('T')[0];
+  }
+
+    const expiryMap: { [key: string]: number } = {
+      'protein': 3,
+      'dairy': 7,
+      'vegetable': 5,
+      'fruit': 7,
+      'grain': 180,
+      'condiment': 365,
+      'cooking_oil': 365,
+      'other_food': 30
+    };
+
+    daysUntilExpiry = expiryMap[category] || 30;
+
+    const itemLower = itemName.toLowerCase();
+    if (itemLower.includes('egg')) daysUntilExpiry = 21;
+    if (itemLower.includes('milk')) daysUntilExpiry = 5;
+    if (itemLower.includes('chicken') || itemLower.includes('meat')) daysUntilExpiry = 3;
+    if (itemLower.includes('fish')) daysUntilExpiry = 2;
+
+    const expiryDate = new Date(purchase);
+    expiryDate.setDate(expiryDate.getDate() + daysUntilExpiry);
+    
+    return expiryDate.toISOString().split('T')[0];
+  }
+
+  private normalizeItemName(name: string): string {
+    return name.trim().toLowerCase().replace(/s$/, '');
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private getMockReceiptText(): string {
+    return `AEON SUPERMARKET
+Receipt No: 12345
+Date: 2024-01-15
+
+Tomato 500g        RM 3.50
+Onion 1kg          RM 2.80
+Chicken Breast     RM 12.00
+Milk 1L            RM 5.50
+
+TOTAL:             RM 23.80`;
+  }
+
   private getMockParsedData(): any {
     return {
-      store_name: 'AEON Supermarket',
-      purchase_date: new Date().toISOString().split('T')[0],
-      total_amount: 75.00,
-      currency: 'MYR',
+      store_name: "AEON",
+      purchase_date: "2024-01-15",
+      total_amount: 23.80,
+      currency: "MYR",
       items: [
-        { name: 'Chicken Breast', quantity: 500, unit: 'grams', price: 15.50 },
-        { name: 'Rice', quantity: 2, unit: 'kg', price: 12.00 },
-        { name: 'Onions', quantity: 1, unit: 'kg', price: 3.50 },
-        { name: 'Soy Sauce', quantity: 1, unit: 'bottle', price: 4.20 },
-        { name: 'Garlic', quantity: 200, unit: 'grams', price: 2.50 },
-        { name: 'Cooking Oil', quantity: 1, unit: 'liter', price: 8.00 },
-        { name: 'Detergent', quantity: 1, unit: 'bottle', price: 8.90 },
-        { name: 'Shampoo', quantity: 1, unit: 'bottle', price: 9.50 },
-        { name: 'Eggs', quantity: 10, unit: 'pieces', price: 6.40 }
+        { name: "Tomato", quantity: 500, unit: "g", price: 3.50 },
+        { name: "Onion", quantity: 1, unit: "kg", price: 2.80 },
+        { name: "Chicken Breast", quantity: 1, unit: "pcs", price: 12.00 },
+        { name: "Milk", quantity: 1, unit: "L", price: 5.50 }
       ]
     };
   }
 
-  /**
-   * 🗑️ DELETE THIS: Mock classification
-   */
   private getMockClassification(items: any[]): { cookable: any[]; nonCookable: any[] } {
-    const cookableKeywords = ['chicken', 'rice', 'onion', 'egg', 'sauce', 'oil', 'vegetable', 'meat', 'fish', 'garlic', 'ginger', 'cooking'];
-    const nonCookableKeywords = ['detergent', 'shampoo', 'soap', 'tissue', 'cleaner', 'toothpaste', 'shampoo'];
-    
-    const cookable: any[] = [];
-    const nonCookable: any[] = [];
-    
-    items.forEach(item => {
-      if (!item || !item.name) {
-        console.warn('⚠️ Skipping invalid item:', item);
-        return;
-      }
-      
-      const name = item.name.toLowerCase();
-      const isNonCookable = nonCookableKeywords.some(keyword => name.includes(keyword));
-      
-      if (isNonCookable) {
-        nonCookable.push({
-          ...item,
-          category: 'household',
-          confidence: 0.95
-        });
-      } else {
-        cookable.push({
-          ...item,
-          category: this.guessCategory(name),
-          confidence: cookableKeywords.some(k => name.includes(k)) ? 0.90 : 0.70
-        });
-      }
-    });
-    
-    return { cookable, nonCookable };
-  }
-
-  /**
-   * 🗑️ DELETE THIS: Guess ingredient category
-   */
-  private guessCategory(name: string): string {
-    if (name.includes('chicken') || name.includes('meat') || name.includes('fish')) return 'protein';
-    if (name.includes('rice') || name.includes('pasta') || name.includes('bread')) return 'grain';
-    if (name.includes('onion') || name.includes('carrot') || name.includes('vegetable') || name.includes('garlic')) return 'vegetable';
-    if (name.includes('sauce') || name.includes('soy')) return 'condiment';
-    if (name.includes('egg')) return 'protein';
-    if (name.includes('oil')) return 'cooking_oil';
-    return 'other';
-  }
-
-  /**
-   * 🗑️ DELETE THIS: Delay helper
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return {
+      cookable: items.map(item => ({
+        ...item,
+        category: 'vegetable',
+        confidence: 0.95
+      })),
+      nonCookable: []
+    };
   }
 }
