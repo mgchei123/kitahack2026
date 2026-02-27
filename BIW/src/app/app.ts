@@ -762,8 +762,17 @@ export class App implements OnInit {
     this.consolidationStatus = '⏳ Consolidating inventory...';
 
     try {
-      const result = await this.inventoryService.consolidateInventory();
-      this.consolidationStatus = `✅ Consolidated ${result.consolidated} ingredient types, removed ${result.deleted} duplicates`;
+      // Ensure user is authenticated first
+      const session = await this.supabase.client.auth.getSession();
+      if (!session.data.session) {
+        await this.supabase.signInAnonymously();
+
+      }
+      console.log('🍳 Testing meal recommendations...');
+      const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
+
+        body: { max_meals: 3 }
+      });
       
       await this.loadInventory();
       
