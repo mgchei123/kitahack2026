@@ -1,8 +1,9 @@
-import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart';
+import 'dart:convert';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -12,235 +13,214 @@ class ScannerScreen extends StatefulWidget {
 }
 
 class _ScannerScreenState extends State<ScannerScreen> {
-  bool _isProcessing = false;
-  String _ocrResult = "No receipt scanned yet.";
+  final supabase = Supabase.instance.client;
+  bool _isLoading = false;
+  
+  // Variables for the image picker
+  XFile? _imageFile;
+  final ImagePicker _picker = ImagePicker();
 
-  // Core function: Pick image -> Upload to Storage -> Trigger Edge Function
-  Future<void> _processReceipt() async {
-    setState(() => _isProcessing = true);
-    
+  // Function to open Camera or Gallery
+  Future<void> _pickImage(ImageSource source) async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.camera);
-      
-      if (image == null) {
-        setState(() => _isProcessing = false);
-        return; 
+      final pickedFile = await _picker.pickImage(source: source);
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = pickedFile;
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ Error picking image: $e");
+    }
+  }
+
+  // The magic function to process the receipt and save to database
+  Future<void> _processAndSaveReceipt(List<String> rawItemsFromScanner) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        debugPrint("🚨 User ID not found, please login as Guest again.");
+        return;
       }
 
-      final Uint8List imageBytes = await image.readAsBytes();
-      final String userId = supabase.auth.currentUser!.id;
+      debugPrint("🚀 Sending data to Supabase Edge Function: classify-items...");
       
-      // ✅ FIXED PATH: No double "receipts/" prefix here!
-      final String path = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      // 1. Upload to Storage
-      await supabase.storage.from('receipts').uploadBinary(
-        path,
-        imageBytes,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: false, contentType: 'image/jpeg',),
-      );
-
-      final String fullImageUrl = supabase.storage.from('receipts').getPublicUrl(path);
-
-      // 2. Create Receipt Record with 'pending' status
-      await supabase.from('receipts').insert({
-        'user_id': userId,
-        'image_url': path,
-        'processing_status': 'pending',
-      });
-
-      // 3. Trigger OCR Edge Function
       final response = await supabase.functions.invoke(
-        'ocr', 
-        body: {'image_url': fullImageUrl}
+        'classify-items', 
+        body: {'items': rawItemsFromScanner},
       );
 
-      setState(() {
-        _ocrResult = response.data['raw_text'] ?? "Processing completed, but no text returned.";
-      });
+      final cookableItems = response.data['cookable'] as List<dynamic>;
 
-    // ✅ FIXED CATCH BLOCKS: Proper Dart syntax
-    } on AuthException catch (e) {
-      _showError("Auth Error: ${e.message}");
-    } on StorageException catch (e) {
-      _showError("Storage Error: ${e.message}");
-    } on FunctionException catch (e) {
-      _showError("Edge Function Error: ${e.reasonPhrase}");
+      for (var item in cookableItems) {
+        await supabase.from('user_inventory').insert({
+          'user_id': userId,
+          'ingredient_name': item['name'],       
+          'category': item['category'],          
+          'source': 'receipt',                   
+          'is_available': true,                  
+          'currency': 5.50 + (item['name'].toString().length % 10), 
+          'expiry_date': DateTime.now().add(const Duration(days: 3)).toIso8601String(), 
+        });
+      }
+
+      debugPrint("✅ Success! Items saved to database!");
+      
+      if (mounted) {
+        Navigator.pop(context); 
+      }
+
     } catch (e) {
-      _showError("Unexpected error: $e");
+      debugPrint("❌ Failed to process receipt: $e");
     } finally {
       if (mounted) {
-        setState(() => _isProcessing = false);
+        setState(() {
+          _isLoading = false; 
+        });
       }
     }
-  }
-
-  void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red)
-      );
-    }
-  }
-
-  // --- UI/UX Requirement: Processing Animation ---
-  Widget _buildProcessingOverlay() {
-    if (!_isProcessing) return const SizedBox.shrink();
-
-    return Container(
-      color: Colors.black.withValues(alpha: 0.6), // Darken the background
-      child: Center(
-        child: Card(
-          elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF2E7D32), // Kitchen Green
-                    strokeWidth: 6,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'AI is analyzing your receipt...',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Extracting items and quantities 🧠',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: 200,
-                  child: LinearProgressIndicator(
-                    backgroundColor: Colors.grey.shade200,
-                    color: const Color(0xFF2E7D32),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan Receipt'),
-        backgroundColor: const Color(0xFF2E7D32), // Kitchen Green
+        title: const Text("Scan Receipt"),
+        backgroundColor: const Color(0xFF1B4332),
         foregroundColor: Colors.white,
       ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Center(
+        child: _isLoading 
+          ? const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: _ocrResult == "No receipt scanned yet." 
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.receipt_long, size: 80, color: Colors.grey),
-                                SizedBox(height: 16),
-                                Text("Ready to scan your grocery receipt.", style: TextStyle(color: Colors.grey, fontSize: 16)),
-                              ],
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
-                                    SizedBox(width: 8),
-                                    Text("AI Analysis Complete", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF2E7D32))),
-                                  ],
-                                ),
-                                const Divider(height: 24, thickness: 2),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5, spreadRadius: 1)
-                                    ],
-                                    border: Border.all(color: Colors.grey.shade200) // 模仿收据纸张边缘
-                                  ),
-                                  child: Text(
-                                    _ocrResult,
-                                    style: const TextStyle(
-                                      fontFamily: 'Courier', // 用打字机字体更有收据的感觉
-                                      fontSize: 15,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                // 🌟 新增：准备前往 Dashboard 的按钮
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    // TODO: 跳转到 Dashboard 并传递数据
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Items successfully added to your Kitchen Inventory! 🥦')),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.inventory_2),
-                                  label: const Text("Confirm & Add to Inventory"),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange.shade600,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                )
-                              ],
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 60,
-                  child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _processReceipt,
-                    icon: const Icon(Icons.camera_alt, size: 28),
-                    label: const Text('Capture / Upload Receipt', style: TextStyle(fontSize: 18)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey,
-                    ),
-                  ),
-                ),
+                CircularProgressIndicator(color: Color(0xFF1B4332)),
+                SizedBox(height: 16),
+                Text("AI is sorting your food... Please wait!")
               ],
+            )
+          : SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 1. Show Image Preview OR Placeholder Icon
+                  if (_imageFile != null)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: kIsWeb 
+                          ? Image.network(_imageFile!.path, height: 300, fit: BoxFit.cover)
+                          : Image.file(File(_imageFile!.path), height: 300, fit: BoxFit.cover),
+                      ),
+                    )
+                  else
+                    const Column(
+                      children: [
+                        Icon(Icons.receipt_long, size: 100, color: Colors.grey),
+                        SizedBox(height: 20),
+                        Text("Please upload a receipt", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  
+                  const SizedBox(height: 30),
+
+                  // 2. Buttons to Pick Image
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text("Camera"),
+                        onPressed: () => _pickImage(ImageSource.camera),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.photo_library),
+                        label: const Text("Gallery"),
+                        onPressed: () => _pickImage(ImageSource.gallery),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 40),
+                  
+                  // 3. The Confirm Button (Only shows up AFTER you pick an image)
+                  if (_imageFile != null)
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check),
+                      label: const Text("Confirm & Add to Fridge"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2D6A4F),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      onPressed: () async {
+  setState(() {
+    _isLoading = true; // Show loading spinner
+  });
+
+  try {
+    debugPrint("⬆️ 1. Uploading image to Supabase Storage...");
+    
+    // Convert image to bytes
+    final bytes = await _imageFile!.readAsBytes();
+    final fileExt = _imageFile!.name.split('.').last;
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+    // 🚨 CRITICAL: We upload the image to a Supabase storage bucket named 'receipts'
+    await supabase.storage.from('receipts').uploadBinary(fileName, bytes);
+    
+    // Get the public URL of the uploaded image
+    final imageUrl = supabase.storage.from('receipts').getPublicUrl(fileName);
+    debugPrint("✅ Image uploaded! URL: $imageUrl");
+
+    debugPrint("🔍 2. Calling OCR Edge Function...");
+    
+    // Call the OCR function using the exact parameter your teammate set: 'image_url'
+    final ocrResponse = await supabase.functions.invoke(
+      'ocr', 
+      body: {'image_url': imageUrl}, 
+    );
+
+    // Get the giant block of text from the OCR response
+    final String rawText = ocrResponse.data['raw_text'] ?? "";
+
+    if (rawText.trim().isEmpty) {
+      debugPrint("⚠️ OCR could not read any text!");
+      setState(() { _isLoading = false; });
+      return;
+    }
+
+    debugPrint("✂️ 3. Formatting OCR text for Classification...");
+    
+    // Split the giant text block into an array of individual lines
+    List<String> realScannedWords = rawText
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty) // Remove empty lines
+        .toList();
+
+    debugPrint("🚀 4. Sending ${realScannedWords.length} lines to Classification AI...");
+    
+    // Pass the real array of words to the database function!
+    await _processAndSaveReceipt(realScannedWords);
+
+  } catch (e) {
+    debugPrint("❌ Full Pipeline Failed: $e");
+    setState(() {
+      _isLoading = false;
+    });
+  }
+},
+                    )
+                ],
+              ),
             ),
-          ),
-          _buildProcessingOverlay(),
-        ],
       ),
     );
   }
