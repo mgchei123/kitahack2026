@@ -25,7 +25,7 @@ serve(async (req) => {
     } else if (!authHeader) {
     return new Response(JSON.stringify({ error: 'Missing Authorization' }), { status: 401 });
     }
-        if (!authHeader) {
+    if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

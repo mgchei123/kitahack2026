@@ -152,4 +152,112 @@ export class InventoryService {
       throw error;
     }
   }
+
+  /**
+   * Consolidate duplicate inventory items
+   * Combines items with same name and unit into single entries
+   */
+  async consolidateInventory(): Promise<{ consolidated: number; deleted: number }> {
+    try {
+      const userId = this.supabase.userId;
+      if (!userId) throw new Error('User not authenticated');
+
+      // Get all available items
+      const { data: items, error } = await this.supabase.client
+        .from('user_inventory')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_available', true)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (!items || items.length === 0) return { consolidated: 0, deleted: 0 };
+
+      // Group items by normalized name and unit
+      const groups = new Map<string, InventoryItem[]>();
+      
+      items.forEach(item => {
+        const key = `${this.normalizeIngredientName(item.ingredient_name)}_${item.unit.toLowerCase()}`;
+        if (!groups.has(key)) {
+          groups.set(key, []);
+        }
+        groups.get(key)!.push(item);
+      });
+
+      let consolidated = 0;
+      let deleted = 0;
+
+      // Process each group
+      for (const [key, groupItems] of groups.entries()) {
+        if (groupItems.length > 1) {
+          console.log(`🔄 Consolidating ${groupItems.length} items: ${groupItems[0].ingredient_name}`);
+          
+          // Keep the oldest item (first in list due to order by created_at)
+          const keepItem = groupItems[0];
+          const duplicates = groupItems.slice(1);
+
+          // Sum up quantities
+          const totalQuantity = groupItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+          // Find earliest expiry date (if any)
+          const expiryDates = groupItems
+            .filter(item => item.expiry_date)
+            .map(item => new Date(item.expiry_date!).getTime());
+          const earliestExpiry = expiryDates.length > 0 
+            ? new Date(Math.min(...expiryDates)).toISOString().split('T')[0]
+            : undefined;
+
+          // Update the kept item with combined quantity
+          const { error: updateError } = await this.supabase.client
+            .from('user_inventory')
+            .update({
+              quantity: totalQuantity,
+              expiry_date: earliestExpiry || keepItem.expiry_date,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', keepItem.id);
+
+          if (updateError) {
+            console.error('❌ Error updating consolidated item:', updateError);
+            continue;
+          }
+
+          // Delete duplicate items
+          const duplicateIds = duplicates.map(item => item.id).filter(id => id);
+          if (duplicateIds.length > 0) {
+            const { error: deleteError } = await this.supabase.client
+              .from('user_inventory')
+              .delete()
+              .in('id', duplicateIds);
+
+            if (deleteError) {
+              console.error('❌ Error deleting duplicates:', deleteError);
+            } else {
+              deleted += duplicateIds.length;
+              consolidated++;
+            }
+          }
+        }
+      }
+
+      console.log(`✅ Consolidated ${consolidated} ingredient types, deleted ${deleted} duplicates`);
+      return { consolidated, deleted };
+
+    } catch (error) {
+      console.error('❌ Error consolidating inventory:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Normalize ingredient names for comparison
+   */
+  private normalizeIngredientName(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/s$/, '') // Remove trailing 's'
+      .replace(/[^a-z0-9]/g, ''); // Remove special characters
+  }
+  
 }
