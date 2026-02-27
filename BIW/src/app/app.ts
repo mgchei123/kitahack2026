@@ -216,12 +216,27 @@ import { InventoryService } from './services/inventory.service';
           <p style="color: #ef4444;">⚠️ Please sign in to view inventory</p>
         }
         @if (isAuthenticated) {
-          <button 
-            (click)="loadInventory()" 
-            [disabled]="loadingInventory"
-            style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">
-            {{ loadingInventory ? '⏳ Loading...' : '🔄 Refresh Inventory' }}
-          </button>
+          <div style="margin-bottom: 15px;">
+            <button 
+              (click)="loadInventory()" 
+              [disabled]="loadingInventory"
+              style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+              {{ loadingInventory ? '⏳ Loading...' : '🔄 Refresh Inventory' }}
+            </button>
+            
+            <button 
+              (click)="consolidateInventory()" 
+              [disabled]="consolidating || loadingInventory"
+              style="padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              {{ consolidating ? '⏳ Consolidating...' : '🔗 Consolidate Duplicates' }}
+            </button>
+          </div>
+
+          @if (consolidationStatus) {
+            <div style="padding: 10px; margin-bottom: 15px; background: #f0fdf4; border-radius: 4px; border-left: 4px solid #10b981;">
+              {{ consolidationStatus }}
+            </div>
+          }
 
           @if (loadingInventory) {
             <div style="padding: 20px; text-align: center;">Loading inventory...</div>
@@ -282,21 +297,92 @@ import { InventoryService } from './services/inventory.service';
         @if (mealResults) {
           <div style="margin-top: 15px; padding: 15px; background: #f0fdf4; border-radius: 4px; border-left: 4px solid #10b981;">
             <h4>🍳 Meal Recommendations ({{ mealResults.length }})</h4>
-            @for (meal of mealResults; track meal.id) {
-              <div style="padding: 10px; margin: 10px 0; background: white; border-radius: 4px;">
-                <strong>{{ meal.meal.name }}</strong>
-                <p style="margin: 5px 0;">{{ meal.meal.description }}</p>
-                <small style="color: #666;">
-                  Match: {{ meal.match_score }}% | 
-                  {{ meal.cuisine_type }} | 
-                  {{ meal.difficulty_level }} | 
-                  {{ meal.prep_time + meal.cook_time }} mins |
-                  Savings: RM {{ meal.potential_savings }}
-                </small>
-                <details style="margin-top: 5px;">
-                  <summary style="cursor: pointer; color: #10b981;">View Recipe</summary>
-                  <pre style="white-space: pre-wrap; font-size: 12px; margin: 5px 0;">{{ meal.recipe_instructions }}</pre>
-                </details>
+            @for (meal of mealResults; track $index) {
+              <div style="padding: 15px; margin: 15px 0; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 15px;">
+                <!-- Meal Image -->
+                @if (meal.meal?.image_url) {
+                  <img 
+                    [src]="meal.meal.image_url" 
+                    [alt]="meal.meal.name"
+                    style="width: 200px; height: 150px; object-fit: cover; border-radius: 8px; flex-shrink: 0;"
+                    (error)="handleImageError($event)">
+                }
+                
+                <!-- Meal Details -->
+                <div style="flex: 1;">
+                  <strong style="font-size: 18px; color: #1f2937;">{{ meal.meal?.name || 'Unknown Meal' }}</strong>
+                  <p style="margin: 5px 0; color: #6b7280;">{{ meal.meal?.description || 'No description available' }}</p>
+                  
+                  <!-- Badges -->
+                  <div style="margin: 10px 0;">
+                    <span style="display: inline-block; padding: 4px 8px; background: #10b981; color: white; border-radius: 4px; font-size: 12px; margin-right: 5px;">
+                      ✓ Match: {{ meal.match_score || 0 }}%
+                    </span>
+                    <span style="display: inline-block; padding: 4px 8px; background: #3b82f6; color: white; border-radius: 4px; font-size: 12px; margin-right: 5px;">
+                      {{ meal.cuisine_type || 'International' }}
+                    </span>
+                    <span style="display: inline-block; padding: 4px 8px; background: #f59e0b; color: white; border-radius: 4px; font-size: 12px; margin-right: 5px;">
+                      {{ meal.difficulty_level || 'medium' }}
+                    </span>
+                    <span style="display: inline-block; padding: 4px 8px; background: #8b5cf6; color: white; border-radius: 4px; font-size: 12px; margin-right: 5px;">
+                      ⏱️ {{ (meal.prep_time || 0) + (meal.cook_time || 0) }} mins
+                    </span>
+                    <span style="display: inline-block; padding: 4px 8px; background: #ec4899; color: white; border-radius: 4px; font-size: 12px;">
+                      🍽️ {{ meal.servings || 4 }} servings
+                    </span>
+                  </div>
+
+                  <!-- Dietary Tags -->
+                  @if (meal.dietary_tags && meal.dietary_tags.length > 0) {
+                    <div style="margin: 10px 0;">
+                      <strong style="font-size: 12px; color: #6b7280; text-transform: uppercase;">Dietary:</strong>
+                      @for (tag of meal.dietary_tags; track tag) {
+                        <span style="display: inline-block; padding: 3px 8px; background: #e0f2fe; color: #0369a1; border-radius: 12px; font-size: 11px; margin: 2px;">
+                          {{ tag }}
+                        </span>
+                      }
+                    </div>
+                  }
+
+                  <!-- Potential Savings -->
+                  <div style="margin: 10px 0; padding: 10px; background: #dcfce7; border-radius: 6px; border-left: 3px solid #10b981;">
+                    <strong style="color: #15803d; font-size: 16px;">💰 Potential Savings: RM {{ meal.potential_savings || 0 | number:'1.2-2' }}</strong>
+                    <p style="margin: 5px 0 0 0; color: #166534; font-size: 12px;">Save money by cooking at home instead of eating out!</p>
+                  </div>
+
+                  <!-- Recipe Instructions -->
+                  <details style="margin-top: 10px;">
+                    <summary style="cursor: pointer; color: #10b981; font-weight: bold; padding: 5px 0;">📖 View Full Recipe</summary>
+                    <div style="margin-top: 10px; padding: 15px; background: #f9fafb; border-radius: 6px;">
+                      <!-- Ingredients -->
+                      <div style="margin-bottom: 15px;">
+                        <strong style="color: #1f2937;">✓ You Have:</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px; color: #10b981;">
+                          @for (ing of meal.matched_ingredients; track ing) {
+                            <li>{{ ing.name }} - {{ ing.quantity }} {{ ing.unit }}</li>
+                          }
+                        </ul>
+                      </div>
+
+                      @if (meal.missing_ingredients && meal.missing_ingredients.length > 0) {
+                        <div style="margin-bottom: 15px;">
+                          <strong style="color: #1f2937;">🛒 Need to Buy:</strong>
+                          <ul style="margin: 5px 0; padding-left: 20px; color: #f59e0b;">
+                            @for (ing of meal.missing_ingredients; track ing) {
+                              <li>{{ ing.name }} - {{ ing.quantity }} {{ ing.unit }} (~ RM {{ ing.estimated_price || 0 | number:'1.2-2' }})</li>
+                            }
+                          </ul>
+                        </div>
+                      }
+
+                      <!-- Instructions -->
+                      <div>
+                        <strong style="color: #1f2937;">👨‍🍳 Instructions:</strong>
+                        <pre style="white-space: pre-wrap; font-size: 13px; margin: 10px 0; padding: 15px; background: white; border-radius: 4px; line-height: 1.8; font-family: inherit; border: 1px solid #e5e7eb;">{{ meal.recipe_instructions || 'No instructions available' }}</pre>
+                      </div>
+                    </div>
+                  </details>
+                </div>
               </div>
             }
           </div>
@@ -430,6 +516,10 @@ export class App implements OnInit {
   // Inventory display properties
   userInventory: any[] = [];
   loadingInventory = false;
+  
+  // Consolidation properties
+  consolidating = false;
+  consolidationStatus = '';
 
   constructor(
     public supabase: SupabaseService,
@@ -632,6 +722,10 @@ export class App implements OnInit {
     }
   }
 
+  // ============================================
+  // INVENTORY METHODS
+  // ============================================
+
   async loadInventory() {
     this.loadingInventory = true;
     try {
@@ -659,14 +753,14 @@ export class App implements OnInit {
     }
   }
 
-  // ============================================
-  // MEAL RECOMMENDATIONS & EXPIRY ALERTS
-  // ============================================
+  async consolidateInventory() {
+    if (!confirm('This will combine duplicate items with the same name and unit. Continue?')) {
+      return;
+    }
 
-  async testMealRecommendations() {
-    this.mealLoading = true;
-    this.mealResults = null;
-    
+    this.consolidating = true;
+    this.consolidationStatus = '⏳ Consolidating inventory...';
+
     try {
       // Ensure user is authenticated first
       const session = await this.supabase.client.auth.getSession();
@@ -680,17 +774,73 @@ export class App implements OnInit {
         body: { max_meals: 3 }
       });
       
-      if (error) throw error;
+      await this.loadInventory();
       
-      this.mealResults = data.recommendations || [];
-      console.log('✅ Meal recommendations:', this.mealResults);
+      setTimeout(() => {
+        this.consolidationStatus = '';
+      }, 5000);
+
     } catch (error: any) {
-      console.error('❌ Meal recommendation error:', error);
-      alert(`Error: ${error.message}`);
+      this.consolidationStatus = `❌ Error: ${error.message}`;
+      console.error('❌ Consolidation error:', error);
     } finally {
-      this.mealLoading = false;
+      this.consolidating = false;
     }
   }
+
+  // ============================================
+  // MEAL RECOMMENDATIONS & EXPIRY ALERTS
+  // ============================================
+
+async testMealRecommendations() {
+  this.mealLoading = true;
+  this.mealResults = null;
+  
+  try {
+    // Ensure user is authenticated
+    const session = await this.supabase.client.auth.getSession();
+    if (!session.data.session) {
+      await this.supabase.signInAnonymously();
+      // Wait a bit for auth to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.log('🍳 Testing meal recommendations...');
+    console.log('👤 Current user:', this.supabase.userId);
+    
+    // Don't pass x-hackathon-key, let it use real auth
+    const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
+      body: { max_meals: 3 }
+    });
+    
+    if (error) {
+      console.error('❌ Error object:', error);
+      throw error;
+    }
+    
+    console.log('📥 Raw response:', data);
+    this.mealResults = data.recommendations || [];
+    console.log('✅ Meal recommendations:', this.mealResults);
+    
+    // Check if fields are present
+    if (this.mealResults && this.mealResults.length > 0) {
+      const firstMeal = this.mealResults[0];
+      console.log('🔍 First meal structure:', {
+        has_dietary_tags: !!firstMeal.dietary_tags,
+        has_potential_savings: !!firstMeal.potential_savings,
+        has_image: !!firstMeal.meal?.image_url,
+        dietary_tags: firstMeal.dietary_tags,
+        potential_savings: firstMeal.potential_savings
+      });
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Meal recommendation error:', error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    this.mealLoading = false;
+  }
+}
 
   async testExpiryAlerts() {
     this.expiryLoading = true;
@@ -710,5 +860,13 @@ export class App implements OnInit {
     } finally {
       this.expiryLoading = false;
     }
+  }
+
+  // ============================================
+  // UTILITY METHODS
+  // ============================================
+
+  handleImageError(event: any) {
+    event.target.src = 'https://source.unsplash.com/200x150/?food,meal';
   }
 }
