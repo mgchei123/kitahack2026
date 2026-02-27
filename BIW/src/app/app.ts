@@ -16,17 +16,18 @@ import { InventoryService } from './services/inventory.service';
       @if (currentScreen === 'login') {
         <div class="bg-[#E8F5E9] min-h-screen p-6 flex flex-col justify-center relative">
           <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-green-100 flex flex-col items-center">
-            <svg class="w-16 h-16 text-[#1B8E2D] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            
             <h1 class="text-3xl font-bold text-center text-green-800 mb-2">BeforeItWastes</h1>
             <p class="text-center text-gray-500 mb-10 text-sm">Sync Your Fridge</p>
+
+            <input type="email" placeholder="Email Address" class="w-full mb-5 p-4 text-base border border-gray-200 rounded-2xl bg-gray-50 outline-none focus:border-green-500 transition-colors" />
+            <input type="password" placeholder="Password" class="w-full mb-10 p-4 text-base border border-gray-200 rounded-2xl bg-gray-50 outline-none focus:border-green-500 transition-colors" />
 
             <button 
               (click)="signInAnonymously()" 
               [disabled]="authLoading"
               class="w-full bg-[#1B8E2D] text-white py-4 rounded-2xl font-semibold text-lg shadow-sm active:scale-95 transition-transform disabled:opacity-50">
-              {{ authLoading ? '⏳ Connecting...' : 'Start as Guest' }}
+              {{ authLoading ? '⏳ Connecting...' : 'Sign In' }}
             </button>
             
             @if (authError) {
@@ -40,20 +41,21 @@ import { InventoryService } from './services/inventory.service';
         <div class="bg-[#F0F7FF] h-full overflow-y-auto p-5 pb-40">
           
           <div class="flex justify-between items-center mb-6 pt-2">
-            <h1 class="text-3xl font-bold text-gray-800">Inventory</h1>
-            <button (click)="signOut()" class="p-2 bg-white rounded-full shadow-sm text-red-500 active:scale-90 transition-transform">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            </button>
+            <h1 class="text-2xl font-bold text-gray-800">Inventory</h1>
+            <div class="flex gap-4 items-center text-gray-600">
+              <span class="cursor-pointer p-2 bg-white rounded-full shadow-sm"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg></span>
+              <span (click)="signOut()" class="cursor-pointer p-2 bg-white rounded-full shadow-sm text-red-500"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg></span>
+            </div>
           </div>
 
           <div class="bg-[#D1F2D1] p-6 rounded-3xl mb-8 shadow-sm border border-green-200">
-            <p class="text-green-800 font-medium text-sm mb-1">Items in Fridge</p>
-            <h2 class="text-5xl font-bold text-green-900 my-2">{{ userInventory.length }}</h2>
-            <p class="text-green-700 text-sm">active ingredients tracked</p>
+            <p class="text-green-800 font-medium text-sm mb-1">Value at Risk</p>
+            <h2 class="text-5xl font-bold text-green-900 my-2">RM {{ calculateRiskValue() }}</h2>
+            <p class="text-green-700 text-sm">at risk of waste this week</p>
           </div>
 
           <div class="flex justify-between items-center mb-4">
-            <p class="text-xl font-bold text-gray-800">Your Food</p>
+            <p class="text-lg font-semibold text-gray-800">Alerts</p>
             <button (click)="loadInventory()" class="text-sm text-[#2196F3] font-semibold">Refresh</button>
           </div>
 
@@ -70,27 +72,23 @@ import { InventoryService } from './services/inventory.service';
 
           <div class="space-y-3">
             @for (item of userInventory; track item.id) {
-              <div class="bg-white p-4 rounded-2xl flex items-center justify-between shadow-sm border border-gray-100 relative overflow-hidden">
-                <div class="absolute left-0 top-0 bottom-0 w-1" [ngClass]="item.source === 'receipt' ? 'bg-[#10b981]' : 'bg-[#8b5cf6]'"></div>
-                <div class="flex items-center gap-4 pl-2">
+              <div class="bg-white p-4 rounded-2xl flex items-center justify-between shadow-sm border border-gray-100">
+                <div class="flex items-center gap-4">
                   <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-2xl border border-gray-100">
                     {{ getCategoryEmoji(item.category) }}
                   </div>
                   <div>
-                    <p class="font-bold text-base text-gray-800 capitalize">{{ item.ingredient_name }}</p>
+                    <p class="font-medium text-base text-gray-800 capitalize">{{ item.ingredient_name }}</p>
                     <p class="text-xs text-gray-500 mt-1">
-                      {{ item.quantity }} {{ item.unit }} • 
-                      @if (item.expiry_date) {
-                        <span class="text-orange-500 font-medium">Exp: {{ item.expiry_date | date:'shortDate' }}</span>
-                      } @else {
-                        <span>No Expiry Set</span>
-                      }
+                      Expire: {{ item.expiry_date ? (item.expiry_date | date:'dd/MM/yyyy') : 'Not set' }}
                     </p>
                   </div>
                 </div>
-                <button (click)="deleteInventoryItem(item.id)" class="text-red-400 p-2 hover:bg-red-50 rounded-full transition-colors">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
+                <div class="text-right flex flex-col items-end">
+                  <div class="w-3 h-3 rounded-full mb-2" [ngClass]="getExpiryColorClass(item.expiry_date)"></div>
+                  <p class="text-sm font-medium text-gray-600">RM {{ item.currency || '0.00' }}</p>
+                  <button (click)="deleteInventoryItem(item.id)" class="text-red-400 mt-1 text-xs hover:underline">Remove</button>
+                </div>
               </div>
             }
           </div>
@@ -103,7 +101,7 @@ import { InventoryService } from './services/inventory.service';
 
           <button 
             (click)="currentScreen = 'input'" 
-            class="fixed bottom-28 right-6 bg-[#2196F3] text-white w-14 h-14 rounded-full shadow-md flex items-center justify-center border-2 border-[#F0F7FF] active:scale-95 transition-transform z-10">
+            class="fixed bottom-28 right-6 bg-[#2196F3] text-white w-14 h-14 rounded-full shadow-md flex items-center justify-center border-2 border-white active:scale-95 transition-transform z-10">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
           </button>
         </div>
@@ -112,16 +110,19 @@ import { InventoryService } from './services/inventory.service';
       @if (currentScreen === 'input') {
         <div class="bg-[#E8F5E9] h-full p-6 flex flex-col relative">
           <button (click)="currentScreen = 'inventory'" class="text-gray-600 mb-8 w-fit p-2 active:scale-90 transition-transform bg-white rounded-full shadow-sm">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5" stroke-width="2"/></svg>
           </button>
           
-          <h2 class="text-2xl font-bold mb-8 text-green-900">Add Food</h2>
           <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*" class="hidden">
 
           <div class="space-y-4">
             <button (click)="fileInput.click()" class="w-full bg-[#4CAF50] text-white p-5 rounded-2xl flex items-center gap-5 shadow-sm active:scale-95 transition-transform">
               <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
               <span class="text-xl font-medium">Scan Receipt</span>
+            </button>
+            <button class="w-full bg-[#4CAF50] text-white p-5 rounded-2xl flex items-center gap-5 shadow-sm active:scale-95 transition-transform">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect width="10" height="20" x="7" y="2" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M7 10h10M10 5v2M10 13v2"/></svg>
+              <span class="text-xl font-medium">Snap Fridge</span>
             </button>
 
             @if (uploadLoading || selectedFile) {
@@ -264,7 +265,7 @@ export class App implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef;
 
   // --- UI Routing State ---
-  currentScreen = 'login'; // 'login', 'inventory', 'input', 'recipe_list', 'cooking_steps'
+  currentScreen = 'login'; 
 
   // --- Auth properties ---
   authStatus = 'Not authenticated';
@@ -277,11 +278,11 @@ export class App implements OnInit {
   uploadLoading = false;
   uploadStatus = 'No file selected';
 
-  // --- Inventory properties ---
+  // --- REAL Inventory properties ---
   userInventory: any[] = [];
   loadingInventory = false;
 
-  // --- Recipe properties (Mock Data) ---
+  // --- MOCK Recipe properties (For flawless presentation) ---
   recipeIndex = 0;
   featuredRecipes = [
     { title: "Healthy Salmon Grill", use: "Salmon Fillet", img: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&q=80", cookTitle: "Grilled Salmon" },
@@ -308,13 +309,45 @@ export class App implements OnInit {
     });
   }
 
-  // Helper for UI Icons
+  // ============================================
+  // UI LOGIC & CALCULATIONS (Real Data connected to Database)
+  // ============================================
   getCategoryEmoji(category: string): string {
     const cats: {[key: string]: string} = {
       'vegetable': '🥬', 'fruit': '🍎', 'protein': '🥩', 
       'dairy': '🥛', 'grain': '🍚', 'beverage': '🧃', 'other': '📦'
     };
     return cats[category?.toLowerCase()] || '🛒';
+  }
+
+  getExpiryColorClass(expiryDateString: string): string {
+    if (!expiryDateString) return 'bg-gray-300'; 
+    
+    const expiry = new Date(expiryDateString);
+    const today = new Date();
+    const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 3600 * 24));
+
+    if (diffDays <= 2) return 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'; 
+    if (diffDays <= 5) return 'bg-yellow-400'; 
+    return 'bg-green-500'; 
+  }
+
+  calculateRiskValue(): string {
+    let riskTotal = 0;
+    const today = new Date();
+    
+    this.userInventory.forEach(item => {
+      if (item.expiry_date) {
+        const expiry = new Date(item.expiry_date);
+        const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        
+        if (diffDays <= 5) {
+          riskTotal += Number(item.currency || 0); 
+        }
+      }
+    });
+    
+    return riskTotal.toFixed(2);
   }
 
   // Carousel Navigation Methods
@@ -352,7 +385,7 @@ export class App implements OnInit {
   }
 
   // ============================================
-  // RECEIPT UPLOAD METHODS 
+  // OCR RECEIPT UPLOAD METHODS (REAL Supabase Edge Function)
   // ============================================
   onFileSelected(event: any) {
     const file = event.target.files[0];
@@ -388,11 +421,14 @@ export class App implements OnInit {
   }
 
   // ============================================
-  // INVENTORY METHODS
+  // INVENTORY METHODS (Real Data connected to Database)
   // ============================================
   async loadInventory() {
     this.loadingInventory = true;
     try {
+      const session = await this.supabase.client.auth.getSession();
+      if (!session.data.session) return; 
+
       this.userInventory = await this.inventoryService.getAvailableIngredients();
     } catch (error: any) {
       console.error('❌ Error loading inventory:', error);
