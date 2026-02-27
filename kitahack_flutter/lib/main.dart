@@ -15,7 +15,7 @@ void main() async {
 
   // 2. Initialize the Supabase backend connection using the keys
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
+    url: 'https://kfqxzxuzzhuqcykgwfeu.supabase.co'!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
