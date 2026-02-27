@@ -28,11 +28,6 @@ verify_jwt = false
 import_map = "./functions/expiry-alerts/deno.json"
 entrypoint = "./functions/expiry-alerts/index.ts"
 
-[functions.ingredient-usage-history]
-enabled = true
-verify_jwt = false
-import_map = "./functions/ingredient-usage-history/deno.json"
-entrypoint = "./functions/ingredient-usage-history/index.ts"
 
 [functions.get-usage-history]
 enabled = true

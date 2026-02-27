@@ -668,11 +668,15 @@ export class App implements OnInit {
     this.mealResults = null;
     
     try {
+      // Ensure user is authenticated first
+      const session = await this.supabase.client.auth.getSession();
+      if (!session.data.session) {
+        await this.supabase.signInAnonymously();
+
+      }
       console.log('🍳 Testing meal recommendations...');
       const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
-        headers: {
-          'x-hackathon-key': 'my-secret-demo-key'
-        },
+
         body: { max_meals: 3 }
       });
       
