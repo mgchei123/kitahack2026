@@ -1,38 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/premium_template.dart';
-
-// Global variable to access Supabase client from anywhere
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this import
+// Global Supabase client — imported by supabase_service.dart and premium_template.dart
 final supabase = Supabase.instance.client;
 
-void main() async {
-  // Ensure Flutter engine bindings are fully initialized
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Load the secure environment variables from .env file
-  await dotenv.load(fileName: ".env");
-
-  // 2. Initialize the Supabase backend connection using the keys
   await Supabase.initialize(
-    url: 'https://kfqxzxuzzhuqcykgwfeu.supabase.co'!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    url:dotenv.env['SUPABASE_URL'] ?? '',      // 🔑 Replace with your project URL
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '', // 🔑 Replace with your anon key
   );
 
-  // 3. Launch the App
-  runApp(const SmartReceiptApp());
+  runApp(const MyApp());
 }
 
-class SmartReceiptApp extends StatelessWidget {
-  const SmartReceiptApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'KitaHack Receipt Planner',
+      title: 'BeforeItWastes',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Using the Kitchen Green primary color #2E7D32 specified in the Guide
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)), 
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B8E2D)),
         useMaterial3: true,
       ),
       home: const PremiumTemplate(),
