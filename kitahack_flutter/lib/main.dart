@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'screens/login_screen.dart';
+import 'screens/premium_template.dart';
 
 // Global variable to access Supabase client from anywhere
 final supabase = Supabase.instance.client;
@@ -35,7 +35,7 @@ class SmartReceiptApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)), 
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      home: const PremiumTemplate(),
     );
   }
 }
