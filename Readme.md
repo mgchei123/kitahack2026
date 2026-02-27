@@ -210,16 +210,17 @@ ng serve
 
 ## 📦 Prerequisites
 
-- Flutter 3.22+
+- Angular CLI 21.0++
 - Supabase CLI
 - Node.js 18+
+- Zone.js 0.16
 - Google AI Studio API Key
 - GitHub account
 
 ## 🏗 Architecture
 ### Overall Architecture
 ```
-User → Flutter App → Supabase Auth → Database
+User → Angular → Supabase Auth → Database
       ↓
   Gemini AI Receipt Scan → Edge Function → Inventory Update
       ↓
@@ -241,4 +242,86 @@ User → Flutter App → Supabase Auth → Database
 
 ### Total Estimated Monthly Cost:
 $0 – $35 depending on traffic.
+
+---
+
+## 🛡 Security
+- Supabase RLS enabled
+- JWT authentication signed as ECC (P-256)
+- No sensitive tokens stored on client
+- Gemini API called via secure Supabase Edge Functions
+
+---
+
+## 🐛 Troubleshooting
+### Receipt Not Scanning?
+- Ensure high-resolution image
+- Use bright lighting
+- Limit background objects
+- in JPEG, JPG, WEBP or PNG
+
+### Cannot Login?
+- Check Supabase credentials
+- Ensure user email confirmed
+
+### AI Recipe Not Generating?
+- Ensure Gemini API key is active
+- Check rate limits (tier 1 account or above)
+
+---
+
+## 📌 Roadmap
+
+### Phase 1 — Core Features (Completed)
+- [x] **Receipt Scanning** – OCR integration for automatic data entry.
+- [x] **Inventory Tracking** – Real-time monitoring of pantry levels.
+- [x] **Recipe Generator** – AI-driven suggestions based on available stock.
+
+---
+
+### Phase 2 — Community Features (Current)
+- [x] **Expiry Alerts** – Automated notifications for aging items.
+- [x] **Inventory Management** – User manually add or change their food inside inventory
+- [ ] **Waste Badges** – Gamified rewards for sustainable habits.
+- [ ] *Status: In Progress* 🚧
+
+---
+
+### Phase 3 — Advanced AI (Planned)
+- [ ] **Nutrition Calculation** – Macro/Micro-nutrient breakdown.
+- [ ] **Personalized Diet Planning** – AI-tailored health goals.
+- [ ] **Multi-language Support** – Global localization.
+- [ ] **Voice Interface Agent** – understand user voice input.
+
+---
+
+## 🛠 Technology Stack
+### Frontend
+Angular CLI
+
+### Backend
+- Supabase Auth
+- Supabase Database
+- Supabase Edge Functions
+
+### AI Models
+- Google Gemini 2.0
+- Google Gemini 2.5 Flash
+- Google Gemini 2.5 Flash Lite
+
+---
+
+## License
+This project is part of the BeforeItWaste (BIW) initiative.  
+
+---
+
+## Acknowledgments
+* Team Potato Server
+* Google Gemini AI
+* Supabase Team
+* Angular Community
+* KITAHack 2026
+---
+
 
