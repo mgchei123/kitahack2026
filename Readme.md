@@ -312,7 +312,7 @@ Angular CLI
 ---
 
 ## License
-This project is part of the BeforeItWaste (BIW) initiative.  
+This project is part of the BIW (BeforeItWaste) initiative.  
 
 ---
 
