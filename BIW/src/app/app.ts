@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SupabaseService } from './services/supabase.service';
@@ -11,425 +11,283 @@ import { InventoryService } from './services/inventory.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div style="padding: 20px; font-family: sans-serif; max-width: 1200px; margin: 0 auto;">
-      <h1>🚀 Supabase + Gemini Dashboard</h1>
+    <div class="font-sans text-gray-800 antialiased max-w-md mx-auto h-screen relative overflow-hidden bg-white shadow-2xl">
+      
+      @if (currentScreen === 'login') {
+        <div class="bg-[#E8F5E9] min-h-screen p-6 flex flex-col justify-center relative">
+          <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-green-100 flex flex-col items-center">
+            <svg class="w-16 h-16 text-[#1B8E2D] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h1 class="text-3xl font-bold text-center text-green-800 mb-2">BeforeItWastes</h1>
+            <p class="text-center text-gray-500 mb-10 text-sm">Sync Your Fridge</p>
 
-      <!-- Auth Status -->
-      <div style="margin: 20px 0; padding: 15px; background: #e8f5e9; border-radius: 4px;">
-        <strong>Auth Status:</strong> {{ authStatus }}
-        <br><br>
-        @if (!isAuthenticated) {
-          <button 
-            (click)="signInAnonymously()" 
-            style="padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-            🚀 Sign In Anonymously
-          </button>
-          
-          <button 
-            (click)="showEmailAuth = !showEmailAuth" 
-            style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            📧 {{ showEmailAuth ? 'Hide' : 'Show' }} Email Auth
-          </button>
-        }
-        @if (isAuthenticated) {
-          <button 
-            (click)="signOut()" 
-            style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            🚪 Sign Out
-          </button>
-        }
-      </div>
-
-      <!-- Email Auth Form -->
-      @if (showEmailAuth && !isAuthenticated) {
-        <div style="margin: 20px 0; padding: 15px; background: #fff3e0; border-radius: 4px;">
-          <h3>Email Authentication</h3>
-          <input 
-            type="email" 
-            [(ngModel)]="email" 
-            placeholder="email@example.com"
-            style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
-          <input 
-            type="password" 
-            [(ngModel)]="password" 
-            placeholder="password"
-            style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
-          
-          <button 
-            (click)="signInWithEmail()" 
-            [disabled]="authLoading"
-            style="padding: 10px 20px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 5px 5px 0;">
-            {{ authLoading ? '⏳ Signing in...' : '🔑 Sign In' }}
-          </button>
-          
-          <button 
-            (click)="signUpWithEmail()" 
-            [disabled]="authLoading"
-            style="padding: 10px 20px; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px 0;">
-            {{ authLoading ? '⏳ Creating...' : '✨ Sign Up' }}
-          </button>
-          
-          @if (authError) {
-            <div style="color: #f44336; margin-top: 10px;">{{ authError }}</div>
-          }
+            <button 
+              (click)="signInAnonymously()" 
+              [disabled]="authLoading"
+              class="w-full bg-[#1B8E2D] text-white py-4 rounded-2xl font-semibold text-lg shadow-sm active:scale-95 transition-transform disabled:opacity-50">
+              {{ authLoading ? '⏳ Connecting...' : 'Start as Guest' }}
+            </button>
+            
+            @if (authError) {
+              <p class="text-red-500 text-sm mt-4">{{ authError }}</p>
+            }
+          </div>
         </div>
       }
 
-      <hr style="margin: 30px 0;">
-
-      <!-- Test Receipt Upload -->
-      <div style="margin: 20px 0;">
-        <h3>📸 Receipt Upload & Processing</h3>
-        @if (!isAuthenticated) {
-          <p style="color: #ef4444;">⚠️ Please sign in first to upload receipts</p>
-        }
-        @if (isAuthenticated) {
-          <input 
-            type="file" 
-            (change)="onFileSelected($event)" 
-            accept="image/*"
-            style="margin-bottom: 10px;">
-          <br>
-          <button 
-            (click)="testReceiptUpload()" 
-            [disabled]="!selectedFile || uploadLoading"
-            style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            {{ uploadLoading ? '⏳ Processing...' : '📤 Upload & Process Receipt' }}
-          </button>
+      @if (currentScreen === 'inventory') {
+        <div class="bg-[#F0F7FF] h-full overflow-y-auto p-5 pb-40">
           
-          <div style="margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-            <strong>Status:</strong> {{ uploadStatus }}
+          <div class="flex justify-between items-center mb-6 pt-2">
+            <h1 class="text-3xl font-bold text-gray-800">Inventory</h1>
+            <button (click)="signOut()" class="p-2 bg-white rounded-full shadow-sm text-red-500 active:scale-90 transition-transform">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            </button>
           </div>
-        }
-      </div>
 
-      <hr style="margin: 30px 0;">
+          <div class="bg-[#D1F2D1] p-6 rounded-3xl mb-8 shadow-sm border border-green-200">
+            <p class="text-green-800 font-medium text-sm mb-1">Items in Fridge</p>
+            <h2 class="text-5xl font-bold text-green-900 my-2">{{ userInventory.length }}</h2>
+            <p class="text-green-700 text-sm">active ingredients tracked</p>
+          </div>
 
-      <!-- Manual Food Addition Section -->
-      <div style="margin: 20px 0;">
-        <h3>🍎 Manual Food Addition</h3>
-        @if (!isAuthenticated) {
-          <p style="color: #ef4444;">⚠️ Please sign in first to add food manually</p>
-        }
-        @if (isAuthenticated) {
-          <button 
-            (click)="toggleManualFoodForm()" 
-            style="padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">
-            {{ showManualFoodForm ? '❌ Cancel' : '➕ Add Food Manually' }}
-          </button>
-
-          @if (showManualFoodForm) {
-            <div style="padding: 20px; background: #f3f4f6; border-radius: 8px; border: 2px solid #8b5cf6;">
-              <h4>Add Ingredient</h4>
-              
-              <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ingredient Name *</label>
-                <input 
-                  [(ngModel)]="manualFoodForm.ingredient_name"
-                  type="text" 
-                  placeholder="e.g., Tomatoes, Chicken Breast, Rice"
-                  style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div>
-                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Quantity *</label>
-                  <input 
-                    [(ngModel)]="manualFoodForm.quantity"
-                    type="number" 
-                    min="0.1"
-                    step="0.1"
-                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
-                </div>
-
-                <div>
-                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Unit *</label>
-                  <select 
-                    [(ngModel)]="manualFoodForm.unit"
-                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    <option value="pieces">Pieces</option>
-                    <option value="kg">Kilograms (kg)</option>
-                    <option value="g">Grams (g)</option>
-                    <option value="l">Liters (l)</option>
-                    <option value="ml">Milliliters (ml)</option>
-                    <option value="cups">Cups</option>
-                    <option value="tbsp">Tablespoons</option>
-                    <option value="tsp">Teaspoons</option>
-                    <option value="pack">Pack</option>
-                    <option value="bottle">Bottle</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div>
-                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Category</label>
-                  <select 
-                    [(ngModel)]="manualFoodForm.category"
-                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    <option value="">Select Category</option>
-                    <option value="vegetable">Vegetable</option>
-                    <option value="fruit">Fruit</option>
-                    <option value="protein">Protein (Meat/Fish)</option>
-                    <option value="dairy">Dairy</option>
-                    <option value="grain">Grain/Rice/Pasta</option>
-                    <option value="spice">Spice/Seasoning</option>
-                    <option value="canned">Canned Goods</option>
-                    <option value="frozen">Frozen</option>
-                    <option value="beverage">Beverage</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style="display: block; margin-bottom: 5px; font-weight: bold;">Expiry Date</label>
-                  <input 
-                    [(ngModel)]="manualFoodForm.expiry_date"
-                    type="date" 
-                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px;">
-                </div>
-              </div>
-
-              <button 
-                (click)="addManualFood()"
-                [disabled]="addingManualFood || !manualFoodForm.ingredient_name"
-                style="padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">
-                {{ addingManualFood ? '⏳ Adding...' : '✅ Add to Inventory' }}
-              </button>
-
-              @if (manualFoodStatus) {
-                <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px; text-align: center;">
-                  {{ manualFoodStatus }}
-                </div>
-              }
-            </div>
-          }
-        }
-      </div>
-
-      <hr style="margin: 30px 0;">
-
-      <!-- View Inventory Section -->
-      <div style="margin: 20px 0;">
-        <h3>📦 Your Inventory</h3>
-        @if (!isAuthenticated) {
-          <p style="color: #ef4444;">⚠️ Please sign in to view inventory</p>
-        }
-        @if (isAuthenticated) {
-          <button 
-            (click)="loadInventory()" 
-            [disabled]="loadingInventory"
-            style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">
-            {{ loadingInventory ? '⏳ Loading...' : '🔄 Refresh Inventory' }}
-          </button>
+          <div class="flex justify-between items-center mb-4">
+            <p class="text-xl font-bold text-gray-800">Your Food</p>
+            <button (click)="loadInventory()" class="text-sm text-[#2196F3] font-semibold">Refresh</button>
+          </div>
 
           @if (loadingInventory) {
-            <div style="padding: 20px; text-align: center;">Loading inventory...</div>
-          } @else if (userInventory.length === 0) {
-            <div style="padding: 20px; background: #f3f4f6; border-radius: 4px; text-align: center;">
-              <p>No items in inventory yet. Add items manually or scan a receipt!</p>
+            <div class="text-center py-10 text-gray-500">Loading your fridge...</div>
+          }
+
+          @if (!loadingInventory && userInventory.length === 0) {
+            <div class="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300">
+              <p class="text-gray-500">Fridge is empty!</p>
+              <p class="text-sm text-gray-400 mt-2">Tap the + button to add food.</p>
             </div>
-          } @else {
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
-              @for (item of userInventory; track item.id) {
-                <div style="padding: 15px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                    <strong style="color: #1f2937; font-size: 16px;">{{ item.ingredient_name }}</strong>
-                    <button 
-                      (click)="deleteInventoryItem(item.id)"
-                      style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">
-                      🗑️
-                    </button>
+          }
+
+          <div class="space-y-3">
+            @for (item of userInventory; track item.id) {
+              <div class="bg-white p-4 rounded-2xl flex items-center justify-between shadow-sm border border-gray-100 relative overflow-hidden">
+                <div class="absolute left-0 top-0 bottom-0 w-1" [ngClass]="item.source === 'receipt' ? 'bg-[#10b981]' : 'bg-[#8b5cf6]'"></div>
+                <div class="flex items-center gap-4 pl-2">
+                  <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-2xl border border-gray-100">
+                    {{ getCategoryEmoji(item.category) }}
                   </div>
-                  <div style="color: #6b7280; font-size: 14px;">
-                    <p style="margin: 5px 0;">📊 {{ item.quantity }} {{ item.unit }}</p>
-                    <p style="margin: 5px 0;">🏷️ {{ item.category || 'N/A' }}</p>
-                    @if (item.expiry_date) {
-                      <p style="margin: 5px 0; color: #f59e0b;">⏰ Expires: {{ item.expiry_date | date:'shortDate' }}</p>
-                    }
-                    <p style="margin: 5px 0; font-size: 12px;">
-                      <span [style.color]="item.source === 'receipt' ? '#10b981' : '#8b5cf6'">
-                        {{ item.source === 'receipt' ? '🧾 From Receipt' : '✍️ Manual Entry' }}
-                      </span>
+                  <div>
+                    <p class="font-bold text-base text-gray-800 capitalize">{{ item.ingredient_name }}</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                      {{ item.quantity }} {{ item.unit }} • 
+                      @if (item.expiry_date) {
+                        <span class="text-orange-500 font-medium">Exp: {{ item.expiry_date | date:'shortDate' }}</span>
+                      } @else {
+                        <span>No Expiry Set</span>
+                      }
                     </p>
                   </div>
                 </div>
-              }
-            </div>
-          }
-        }
-      </div>
-
-      <hr style="margin: 30px 0;">
-
-      <!-- Meal Recommendations & Expiry Alerts -->
-      <div style="margin: 20px 0;">
-        <h3>🍽️ Meal Recommendations & Alerts</h3>
-        <button 
-          (click)="testMealRecommendations()" 
-          [disabled]="mealLoading"
-          style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-          {{ mealLoading ? '⏳ Loading...' : '🍳 Get Meal Recommendations' }}
-        </button>
-        
-        <button 
-          (click)="testExpiryAlerts()" 
-          [disabled]="expiryLoading"
-          style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          {{ expiryLoading ? '⏳ Checking...' : '⏰ Check Expiry Alerts' }}
-        </button>
-
-        @if (mealResults) {
-          <div style="margin-top: 15px; padding: 15px; background: #f0fdf4; border-radius: 4px; border-left: 4px solid #10b981;">
-            <h4>🍳 Meal Recommendations ({{ mealResults.length }})</h4>
-            @for (meal of mealResults; track meal.id) {
-              <div style="padding: 10px; margin: 10px 0; background: white; border-radius: 4px;">
-                <strong>{{ meal.meal.name }}</strong>
-                <p style="margin: 5px 0;">{{ meal.meal.description }}</p>
-                <small style="color: #666;">
-                  Match: {{ meal.match_score }}% | 
-                  {{ meal.cuisine_type }} | 
-                  {{ meal.difficulty_level }} | 
-                  {{ meal.prep_time + meal.cook_time }} mins |
-                  Savings: RM {{ meal.potential_savings }}
-                </small>
-                <details style="margin-top: 5px;">
-                  <summary style="cursor: pointer; color: #10b981;">View Recipe</summary>
-                  <pre style="white-space: pre-wrap; font-size: 12px; margin: 5px 0;">{{ meal.recipe_instructions }}</pre>
-                </details>
+                <button (click)="deleteInventoryItem(item.id)" class="text-red-400 p-2 hover:bg-red-50 rounded-full transition-colors">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
               </div>
             }
           </div>
-        }
 
-        @if (expiryResults) {
-          <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 4px; border-left: 4px solid #f59e0b;">
-            <h4>⏰ Expiry Alert Summary</h4>
-            <p><strong>Total Expiring Items:</strong> {{ expiryResults.summary?.total_expiring_items || 0 }}</p>
-            <p><strong>Users Affected:</strong> {{ expiryResults.summary?.users_affected || 0 }}</p>
-            <p><strong>Alerts Sent:</strong> {{ expiryResults.summary?.alerts_sent || 0 }}</p>
-            @if (expiryResults.alerts && expiryResults.alerts.length > 0) {
-              <div style="margin-top: 10px;">
-                @for (alert of expiryResults.alerts; track $index) {
-                  <div style="padding: 10px; margin: 5px 0; background: white; border-radius: 4px;">
-                    <p>{{ alert.message }}</p>
-                    <small style="color: #666;">{{ alert.item_count }} items ({{ alert.urgent_count }} urgent)</small>
+          <button 
+            (click)="currentScreen = 'recipe_list'" 
+            class="fixed bottom-8 left-5 right-5 max-w-md mx-auto bg-[#1B8E2D] text-white py-4 rounded-2xl font-semibold text-lg shadow-md active:scale-95 transition-transform z-10">
+            Suggest Recipe
+          </button>
+
+          <button 
+            (click)="currentScreen = 'input'" 
+            class="fixed bottom-28 right-6 bg-[#2196F3] text-white w-14 h-14 rounded-full shadow-md flex items-center justify-center border-2 border-[#F0F7FF] active:scale-95 transition-transform z-10">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          </button>
+        </div>
+      }
+
+      @if (currentScreen === 'input') {
+        <div class="bg-[#E8F5E9] h-full p-6 flex flex-col relative">
+          <button (click)="currentScreen = 'inventory'" class="text-gray-600 mb-8 w-fit p-2 active:scale-90 transition-transform bg-white rounded-full shadow-sm">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          </button>
+          
+          <h2 class="text-2xl font-bold mb-8 text-green-900">Add Food</h2>
+          <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*" class="hidden">
+
+          <div class="space-y-4">
+            <button (click)="fileInput.click()" class="w-full bg-[#4CAF50] text-white p-5 rounded-2xl flex items-center gap-5 shadow-sm active:scale-95 transition-transform">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+              <span class="text-xl font-medium">Scan Receipt</span>
+            </button>
+
+            @if (uploadLoading || selectedFile) {
+              <div class="bg-white p-4 rounded-xl shadow-sm border border-green-200 mt-4">
+                <p class="text-sm font-medium text-gray-700">{{ uploadStatus }}</p>
+                @if (selectedFile && !uploadLoading) {
+                  <button (click)="testReceiptUpload()" class="mt-3 w-full bg-[#ff9800] text-white py-2 rounded-lg font-bold shadow-sm">Confirm & Extract</button>
+                }
+                @if (uploadLoading) {
+                  <div class="mt-3 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-green-500 animate-pulse w-full"></div>
                   </div>
                 }
               </div>
             }
           </div>
-        }
-      </div>
+        </div>
+      }
 
-      <hr style="margin: 30px 0;">
-
-      <!-- View Receipts -->
-      <div style="margin: 20px 0;">
-        <h3>📋 My Receipts</h3>
-        @if (!isAuthenticated) {
-          <p style="color: #ef4444;">⚠️ Please sign in to view receipts</p>
-        }
-        @if (isAuthenticated) {
-          <button 
-            (click)="loadReceipts()" 
-            [disabled]="loadingReceipts"
-            style="padding: 10px 20px; background: #9c27b0; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            {{ loadingReceipts ? '⏳ Loading...' : '🔄 Refresh Receipts' }}
+      @if (currentScreen === 'recipe_list') {
+        <div class="bg-[#F0F7FF] min-h-screen p-5 pb-32 overflow-y-auto">
+          <button (click)="currentScreen = 'inventory'" class="text-gray-600 mb-4 w-fit p-2 active:scale-90 transition-transform bg-white rounded-full shadow-sm">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           </button>
           
-          @if (receipts.length === 0 && !loadingReceipts) {
-            <p style="color: #666; margin-top: 10px;">No receipts yet. Upload one above!</p>
-          }
-          
-          @if (receipts.length > 0) {
-            <ul style="list-style: none; padding: 0; margin-top: 10px;">
-              @for (receipt of receipts; track receipt.id) {
-                <li style="padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 4px; border-left: 4px solid #4caf50;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                      <strong style="font-size: 16px;">{{ receipt.store_name }}</strong>
-                      <br>
-                      <span style="color: #10b981; font-weight: bold; font-size: 18px;">{{ receipt.currency }} {{ receipt.total_amount }}</span>
-                      <br>
-                      <small style="color: #666;">
-                        📅 {{ receipt.purchase_date | date:'short' }} | 
-                        📦 {{ receipt.cookable_items?.length || 0 }} cookable items |
-                        🏷️ {{ receipt.non_cookable_items?.length || 0 }} non-cookable
-                      </small>
-                      <br>
-                      <small style="color: #666;">
-                        Status: 
-                        @if (receipt.processing_status === 'completed') {
-                          <span style="color: #4caf50; font-weight: bold;">✅ Completed</span>
-                        } @else if (receipt.processing_status === 'ocr_completed') {
-                          <span style="color: #2196f3; font-weight: bold;">🔍 OCR Done</span>
-                        } @else if (receipt.processing_status === 'processing') {
-                          <span style="color: #ff9800; font-weight: bold;">⏳ Processing</span>
-                        } @else if (receipt.processing_status === 'failed') {
-                          <span style="color: #f44336; font-weight: bold;">❌ Failed</span>
-                        } @else {
-                          <span style="color: #9e9e9e;">⏸️ {{ receipt.processing_status }}</span>
-                        }
-                      </small>
-                    </div>
-                    <button 
-                      (click)="viewReceiptDetails(receipt.id)"
-                      style="padding: 8px 16px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                      👁️ View
-                    </button>
-                  </div>
-                </li>
-              }
-            </ul>
-          }
-        }
-      </div>
+          <h1 class="text-2xl font-bold mb-6 text-gray-800">AI Recipe Matches</h1>
+
+          <div class="bg-white rounded-3xl overflow-hidden shadow-sm mb-8 border border-gray-100 relative group">
+            <img [src]="featuredRecipes[recipeIndex].img" alt="Meal" class="w-full h-56 object-cover transition-all duration-300" />
+            
+            <button (click)="prevRecipe()" class="absolute top-24 left-4 bg-white/90 w-10 h-10 flex items-center justify-center rounded-full text-green-800 shadow-sm active:scale-90 transition-transform">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 18l-6-6 6-6" /></svg>
+            </button>
+            <button (click)="nextRecipe()" class="absolute top-24 right-4 bg-white/90 w-10 h-10 flex items-center justify-center rounded-full text-green-800 shadow-sm active:scale-90 transition-transform">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18l6-6-6-6" /></svg>
+            </button>
+
+            <div class="p-5">
+              <div class="flex justify-between items-start">
+                <h2 class="text-xl font-semibold text-gray-800">{{ featuredRecipes[recipeIndex].title }}</h2>
+                <div class="flex gap-2 mt-2">
+                  @for (recipe of featuredRecipes; track $index) {
+                    <div class="w-2 h-2 rounded-full transition-colors" [ngClass]="$index === recipeIndex ? 'bg-green-600' : 'bg-gray-200'"></div>
+                  }
+                </div>
+              </div>
+              <p class="text-gray-600 text-sm mt-2">Needs: <span class="font-medium text-gray-800">{{ featuredRecipes[recipeIndex].use }}</span></p>
+            </div>
+          </div>
+
+          <p class="text-lg font-semibold mb-4 text-gray-800">Other Matches</p>
+          <div class="space-y-3">
+            @for (dish of ['Salmon Sushi', 'Salmon Don', 'Salmon Sashimi']; track dish) {
+              <div class="bg-white flex gap-4 items-center p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-gray-500 border border-gray-100">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg>
+                </div>
+                <div>
+                  <p class="font-medium text-base text-gray-800">{{ dish }}</p>
+                  <p class="text-xs text-gray-500 mt-1">Requires Rice</p>
+                </div>
+              </div>
+            }
+          </div>
+
+          <button 
+            (click)="currentScreen = 'cooking_steps'" 
+            class="fixed bottom-8 left-5 right-5 max-w-md mx-auto bg-[#1B8E2D] text-white py-4 rounded-2xl font-semibold text-lg shadow-md active:scale-95 transition-transform z-10">
+            Cook This Now
+          </button>
+        </div>
+      }
+
+      @if (currentScreen === 'cooking_steps') {
+        <div class="bg-[#E8F5E9] min-h-screen p-5 pb-32 overflow-y-auto">
+          <button (click)="currentScreen = 'recipe_list'" class="text-gray-600 mb-4 w-fit p-2 active:scale-90 transition-transform bg-white rounded-full shadow-sm">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          </button>
+
+          <h1 class="text-2xl font-bold mb-6 text-gray-800">Cook: {{ featuredRecipes[recipeIndex].cookTitle }}</h1>
+
+          <img [src]="featuredRecipes[recipeIndex].img" alt="Recipe" class="w-full h-56 object-cover rounded-3xl shadow-sm mb-6" />
+
+          <div class="space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4">
+              <div class="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center text-gray-600 shrink-0 border border-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 2h2M12 16v-6M12 22a4 4 0 0 0 4-4V6a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v12a4 4 0 0 0 4 4ZM10 2h.01M14 2h.01" /></svg>
+              </div>
+              <div>
+                <p class="font-semibold text-base text-gray-800">Step 1: Prep & Season</p>
+                <p class="text-sm text-gray-600 mt-1">Pat the ingredients dry. Brush with olive oil and season generously.</p>
+              </div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4">
+              <div class="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center text-gray-600 shrink-0 border border-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+              </div>
+              <div>
+                <p class="font-semibold text-base text-gray-800">Step 2: Cooking Process</p>
+                <p class="text-sm text-gray-600 mt-1">Place on preheated heat source. Cook thoroughly according to standard food safety.</p>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4">
+              <div class="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center text-gray-600 shrink-0 border border-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9ZM12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9Z" /></svg>
+              </div>
+              <div>
+                <p class="font-semibold text-base text-gray-800">Step 3: Rest & Serve</p>
+                <p class="text-sm text-gray-600 mt-1">Remove from heat and let it rest for 5 minutes. This locks the juices inside.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-8">
+            <p class="text-lg font-semibold mb-4 text-gray-800">Ingredients Used</p>
+            <div class="bg-white p-4 rounded-2xl flex items-center gap-4 border border-green-100 shadow-sm">
+              <div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-green-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.46-3.44 6-7 6s-7.56-2.54-8.5-6ZM18 12v.01M11.52 17.11a12 12 0 1 0 0-10.22M2 9.06v5.88" /></svg>
+              </div>
+              <div>
+                <p class="font-medium text-base text-gray-800">{{ featuredRecipes[recipeIndex].use }}</p>
+                <p class="text-xs text-green-700 mt-1">From your fridge</p>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            (click)="currentScreen = 'inventory'" 
+            class="fixed bottom-8 left-5 right-5 max-w-md mx-auto bg-[#1B8E2D] text-white py-4 rounded-2xl font-semibold text-lg shadow-md active:scale-95 transition-transform z-10">
+            Done Cooking
+          </button>
+        </div>
+      }
     </div>
   `
 })
 export class App implements OnInit {
-  // Auth properties
+  @ViewChild('fileInput') fileInput!: ElementRef;
+
+  // --- UI Routing State ---
+  currentScreen = 'login'; // 'login', 'inventory', 'input', 'recipe_list', 'cooking_steps'
+
+  // --- Auth properties ---
   authStatus = 'Not authenticated';
   isAuthenticated = false;
-  showEmailAuth = false;
-  email = '';
-  password = '';
   authLoading = false;
   authError = '';
 
-  // Receipt upload properties
+  // --- Receipt upload properties ---
   selectedFile: File | null = null;
   uploadLoading = false;
   uploadStatus = 'No file selected';
 
-  // Receipt list properties
-  receipts: any[] = [];
-  loadingReceipts = false;
-
-  // Meal recommendation properties
-  mealLoading = false;
-  mealResults: any[] | null = null;
-
-  // Expiry alert properties
-  expiryLoading = false;
-  expiryResults: any = null;
-
-  // Manual food addition properties
-  showManualFoodForm = false;
-  manualFoodForm = {
-    ingredient_name: '',
-    quantity: 1,
-    unit: 'pieces',
-    category: '',
-    expiry_date: ''
-  };
-  addingManualFood = false;
-  manualFoodStatus = '';
-  
-  // Inventory display properties
+  // --- Inventory properties ---
   userInventory: any[] = [];
   loadingInventory = false;
+
+  // --- Recipe properties (Mock Data) ---
+  recipeIndex = 0;
+  featuredRecipes = [
+    { title: "Healthy Salmon Grill", use: "Salmon Fillet", img: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&q=80", cookTitle: "Grilled Salmon" },
+    { title: "Classic Salmon Sushi", use: "Salmon Fillet, Rice, Nori", img: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&q=80", cookTitle: "Salmon Sushi" },
+    { title: "Baked Salmon Platter", use: "Salmon Fillet, Asparagus", img: "https://images.unsplash.com/photo-1485921325833-c519f76c4927?w=800&q=80", cookTitle: "Baked Salmon" }
+  ];
 
   constructor(
     public supabase: SupabaseService,
@@ -441,52 +299,45 @@ export class App implements OnInit {
   ngOnInit() {
     this.supabase.user$.subscribe(user => {
       this.isAuthenticated = !!user;
-      this.authStatus = user ? `✅ Signed in as ${user.email || 'Anonymous User'}` : '❌ Not authenticated';
+      if (user) {
+        this.currentScreen = 'inventory'; 
+        this.loadInventory();
+      } else {
+        this.currentScreen = 'login';
+      }
     });
+  }
+
+  // Helper for UI Icons
+  getCategoryEmoji(category: string): string {
+    const cats: {[key: string]: string} = {
+      'vegetable': '🥬', 'fruit': '🍎', 'protein': '🥩', 
+      'dairy': '🥛', 'grain': '🍚', 'beverage': '🧃', 'other': '📦'
+    };
+    return cats[category?.toLowerCase()] || '🛒';
+  }
+
+  // Carousel Navigation Methods
+  nextRecipe() {
+    this.recipeIndex = (this.recipeIndex + 1) % this.featuredRecipes.length;
+  }
+
+  prevRecipe() {
+    this.recipeIndex = (this.recipeIndex - 1 + this.featuredRecipes.length) % this.featuredRecipes.length;
   }
 
   // ============================================
   // AUTH METHODS
   // ============================================
-
   async signInAnonymously() {
     this.authLoading = true;
     this.authError = '';
     try {
       const user = await this.supabase.signInAnonymously();
       if (user) {
-        this.authStatus = '✅ Signed in anonymously';
-        console.log('✅ Anonymous sign-in successful');
+        this.currentScreen = 'inventory';
+        this.loadInventory();
       }
-    } catch (error: any) {
-      this.authError = error.message;
-      console.error('❌ Sign-in error:', error);
-    } finally {
-      this.authLoading = false;
-    }
-  }
-
-  async signInWithEmail() {
-    this.authLoading = true;
-    this.authError = '';
-    try {
-      const { error } = await this.supabase.signIn(this.email, this.password);
-      if (error) throw error;
-      this.showEmailAuth = false;
-    } catch (error: any) {
-      this.authError = error.message;
-    } finally {
-      this.authLoading = false;
-    }
-  }
-
-  async signUpWithEmail() {
-    this.authLoading = true;
-    this.authError = '';
-    try {
-      const { error } = await this.supabase.signUp(this.email, this.password);
-      if (error) throw error;
-      this.authError = '✅ Check your email for confirmation link!';
     } catch (error: any) {
       this.authError = error.message;
     } finally {
@@ -496,147 +347,53 @@ export class App implements OnInit {
 
   async signOut() {
     await this.supabase.signOut();
-    this.authStatus = '❌ Signed out';
-    this.receipts = [];
+    this.currentScreen = 'login';
     this.userInventory = [];
   }
 
   // ============================================
-  // RECEIPT UPLOAD METHODS
+  // RECEIPT UPLOAD METHODS 
   // ============================================
-
   onFileSelected(event: any) {
     const file = event.target.files[0];
     if (file) {
       this.selectedFile = file;
-      this.uploadStatus = `📁 File selected: ${file.name}`;
-      console.log('📁 File selected:', file.name);
+      this.uploadStatus = `📁 Ready to extract: ${file.name}`;
     }
   }
 
   async testReceiptUpload() {
-    if (!this.selectedFile) {
-      this.uploadStatus = '❌ Please select a file first';
-      return;
-    }
+    if (!this.selectedFile) return;
 
     this.uploadLoading = true;
-    this.uploadStatus = '⏳ Step 1/6: Uploading image...';
+    this.uploadStatus = '⏳ Step 1/3: AI is analyzing image...';
 
     try {
-      console.log('🚀 Starting receipt processing...');
+      await this.receiptProcessor.processReceiptFull(this.selectedFile);
+      this.uploadStatus = `✅ Success! Items extracted.`;
       
-      const receiptId = await this.receiptProcessor.processReceiptFull(this.selectedFile);
-      
-      this.uploadStatus = `✅ Receipt processed successfully! ID: ${receiptId}`;
-      console.log('✅ Receipt processing complete:', receiptId);
-      
-      await this.loadReceipts();
       await this.loadInventory();
       
       this.selectedFile = null;
+      setTimeout(() => {
+        this.currentScreen = 'inventory';
+        this.uploadStatus = 'No file selected';
+      }, 1500);
       
     } catch (error: any) {
-      this.uploadStatus = `❌ Error: ${error.message}`;
-      console.error('❌ Receipt upload failed:', error);
+      this.uploadStatus = `❌ AI Error: ${error.message}`;
     } finally {
       this.uploadLoading = false;
     }
   }
 
-  async loadReceipts() {
-    this.loadingReceipts = true;
-    try {
-      this.receipts = await this.receiptService.getUserReceipts();
-      console.log(`📋 Loaded ${this.receipts.length} receipts`);
-    } catch (error: any) {
-      console.error('❌ Error loading receipts:', error);
-    } finally {
-      this.loadingReceipts = false;
-    }
-  }
-
-  viewReceiptDetails(receiptId: string) {
-    const receipt = this.receipts.find(r => r.id === receiptId);
-    if (receipt) {
-      console.log('📄 Receipt Details:', receipt);
-      alert(`Receipt Details:\n\nStore: ${receipt.store_name}\nTotal: ${receipt.currency} ${receipt.total_amount}\nStatus: ${receipt.processing_status}\n\nCheck console for full details.`);
-    }
-  }
-
   // ============================================
-  // MANUAL FOOD ADDITION
+  // INVENTORY METHODS
   // ============================================
-
-  toggleManualFoodForm() {
-    this.showManualFoodForm = !this.showManualFoodForm;
-    if (this.showManualFoodForm) {
-      this.manualFoodForm = {
-        ingredient_name: '',
-        quantity: 1,
-        unit: 'pieces',
-        category: '',
-        expiry_date: ''
-      };
-      this.manualFoodStatus = '';
-    }
-  }
-
-  async addManualFood() {
-    if (!this.manualFoodForm.ingredient_name.trim()) {
-      this.manualFoodStatus = '❌ Please enter an ingredient name';
-      return;
-    }
-
-    this.addingManualFood = true;
-    this.manualFoodStatus = '⏳ Adding ingredient...';
-
-    try {
-      const session = await this.supabase.client.auth.getSession();
-      if (!session.data.session) {
-        await this.supabase.signInAnonymously();
-      }
-
-      await this.inventoryService.addManualIngredient({
-        ingredient_name: this.manualFoodForm.ingredient_name.trim(),
-        quantity: this.manualFoodForm.quantity,
-        unit: this.manualFoodForm.unit,
-        category: this.manualFoodForm.category || 'other',
-        expiry_date: this.manualFoodForm.expiry_date || undefined,
-        source: 'manual_entry',
-        is_available: true
-      });
-
-      this.manualFoodStatus = '✅ Ingredient added successfully!';
-      console.log('✅ Manual ingredient added:', this.manualFoodForm.ingredient_name);
-
-      this.manualFoodForm = {
-        ingredient_name: '',
-        quantity: 1,
-        unit: 'pieces',
-        category: '',
-        expiry_date: ''
-      };
-
-      await this.loadInventory();
-
-      setTimeout(() => {
-        this.showManualFoodForm = false;
-      }, 2000);
-
-    } catch (error: any) {
-      this.manualFoodStatus = `❌ Error: ${error.message}`;
-      console.error('❌ Failed to add manual ingredient:', error);
-    } finally {
-      this.addingManualFood = false;
-    }
-  }
-
   async loadInventory() {
     this.loadingInventory = true;
     try {
       this.userInventory = await this.inventoryService.getAvailableIngredients();
-      console.log(`📦 Loaded ${this.userInventory.length} inventory items`);
     } catch (error: any) {
       console.error('❌ Error loading inventory:', error);
     } finally {
@@ -645,70 +402,12 @@ export class App implements OnInit {
   }
 
   async deleteInventoryItem(itemId: string) {
-    if (!confirm('Are you sure you want to delete this item?')) {
-      return;
-    }
-
+    if (!confirm('Remove this food from your fridge?')) return;
     try {
       await this.inventoryService.updateIngredientQuantity(itemId, 0);
       await this.loadInventory();
-      console.log('✅ Item deleted');
     } catch (error: any) {
       console.error('❌ Error deleting item:', error);
-      alert(`Error: ${error.message}`);
-    }
-  }
-
-  // ============================================
-  // MEAL RECOMMENDATIONS & EXPIRY ALERTS
-  // ============================================
-
-  async testMealRecommendations() {
-    this.mealLoading = true;
-    this.mealResults = null;
-    
-    try {
-      // Ensure user is authenticated first
-      const session = await this.supabase.client.auth.getSession();
-      if (!session.data.session) {
-        await this.supabase.signInAnonymously();
-
-      }
-      console.log('🍳 Testing meal recommendations...');
-      const { data, error } = await this.supabase.client.functions.invoke('meal-recommendation', {
-
-        body: { max_meals: 3 }
-      });
-      
-      if (error) throw error;
-      
-      this.mealResults = data.recommendations || [];
-      console.log('✅ Meal recommendations:', this.mealResults);
-    } catch (error: any) {
-      console.error('❌ Meal recommendation error:', error);
-      alert(`Error: ${error.message}`);
-    } finally {
-      this.mealLoading = false;
-    }
-  }
-
-  async testExpiryAlerts() {
-    this.expiryLoading = true;
-    this.expiryResults = null;
-    
-    try {
-      console.log('⏰ Testing expiry alerts...');
-      const { data, error } = await this.supabase.client.functions.invoke('expiry-alerts');
-      
-      if (error) throw error;
-      
-      this.expiryResults = data;
-      console.log('✅ Expiry alerts:', this.expiryResults);
-    } catch (error: any) {
-      console.error('❌ Expiry alert error:', error);
-      alert(`Error: ${error.message}`);
-    } finally {
-      this.expiryLoading = false;
     }
   }
 }
