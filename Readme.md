@@ -1,170 +1,244 @@
-# BIW - Team Setup Guide ( deleting this after all is updated)
+# 🌾 BIW (Before It Waste) - AI-Powered Food Waste Prevention & Smart Inventory System
 
-## 🔑 API Keys Setup
+**A modern, cross-platform food sustainability platform built to track groceries, predict expiry, generate recipes, and reduce food waste using AI.**
 
-### Firebase Config (SHARED - Same for Everyone)
+## Project Overview
 
-**Ask the project leader (Suanloh) for the Firebase config**, then paste it into your `environment.ts`:
+BIW — Before It Waste is an AI-assisted food management and waste-prevention platform powered by Google Gemini and Supabase.
+Our system scans grocery receipts, detects items & expiry dates, tracks inventory, sends alerts, generates recipes, and encourages users to reduce waste — aligned with:
 
-```typescript
-firebase: {
-  apiKey: ".. .",  // Shared - provided by project leader
-  authDomain: "...",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "...",
-  measurementId: "..."
-}
-```
+- SDG 12: Responsible Consumption & Production
 
-### Gemini API Key (INDIVIDUAL - Each Person Gets Their Own)
+- SDG 2: Zero Hunger
 
-**Each team member creates their own FREE Gemini API key:**
 
-1. Go to https://aistudio.google.com/app/apikey
-2. Sign in with your Google account
-3. Click **"Create API Key"**
-4. Click **"Create API key in new project"**
-5. Copy your key
-6. Paste into `environment.ts`:
+Built for students, families, communities, and anyone aiming for smarter consumption.
 
-```typescript
-geminiApiKey: "YOUR_OWN_GEMINI_KEY_HERE"  // Your personal key
-```
+## 🎯 Platform Capabilities
+**🧾 Receipt Scanner**
+- Gemini 2.5 Vision for OCR
+- Automatic item detection
+- Predict expiry dates using AI heuristics
 
-**Why separate keys?**
-- ✅ Free tier:  15 requests/minute per key
-- ✅ No quota conflicts
-- ✅ Everyone can work independently
+**🗃 Smart Inventory Tracker**
+- Supabase database
+- Auto updates when scanning new receipts
+- Categorization by food type
+
+**⏳ Expiry & Waste Alerts**
+- Push notifications
+- Reminder timeline
+- “Use Soon” recommendation page
+
+**🍳 AI Recipe Generator**
+- Gemini-based recipe generation
+- Custom prompts based on user inventory
+- Zero-waste cooking suggestions
+
+**♻️ Food Waste Analytics**
+- Tracks monthly food saving
+- Identifies frequently wasted items
+- Visual progress charts (via Flutter)
+
+## 🔐 Authentication System
+
+Powered by Supabase Auth
+
+**Features:**
+
+- Email + Password login
+- Magic link support
+- JWT-based secured API
+- Row Level Security (RLS) for user-specific data
+- Multi-device login
+
+
+**DB Tables:**
+
+- users
+- inventory_items
+- receipts
+- food_waste_logs
+- recipe_history
+
+## 🤖 Agents
+
+### 1. 🧾 Receipt Intelligence Agent
+
+**Purpose:** Extract items from receipts
+
+**Tech:** Gemini 2.5 Vision
+
+**Capabilities:**
+- OCR extraction
+- Item price + quantity detection
+- Categorization (vegetable, dairy, canned food…)
+- Expiry prediction model
 
 ---
 
-## 🚀 Full Setup Steps
+### 2. 🗃 Inventory Management Agent
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/Suanloh/kitahack2026.git
-cd kitahack2026/BIW
+**Purpose:** Maintain real-time stock levels
+
+**Tech:** Supabase Edge Functions
+
+**Handles:**
+- Insert new scanned items
+- Update quantities
+- Suggest items that need to be used within 3 days
+- Auto-cleanup expired items
+
+--- 
+
+### 3. 🍳 Recipe Advisor Agent
+
+**Purpose:** Generate AI recipes
+
+**Tech:** Gemini 2.0 + 2.5 Text
+
+**Features:**
+- Ingredient-based recipes
+- Meal planner
+- Diet filters (Halal, vegetarian, low-budget)
+- Zero-waste suggestions
+
+--- 
+
+## 📁 Project Structure
+
 ```
+kitahack2026/                          ← THIS IS THE PROJECT ROOT! 🎯
+│
+├── .npmrc                             ← npm configuration
+├── .vscode/                           ← VSCode settings
+├── package.json                       ← Root package.json (minimal)
+├── package-lock.json                  ← Root dependencies lock file
+├── node_modules/                      ← Root node modules (can be ignored)
+│
+├── Readme.md                          ← Main README file ✏️
+│
+├── BIW/                               ← Angular Frontend Application 🅰️
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── app.ts                 ← Main app component
+│   │   │   ├── app.html
+│   │   │   ├── app.config.ts
+│   │   │   ├── app.routes.ts
+│   │   │   ├── app.spec.ts
+│   │   │   └── services/              ← Angular services
+│   │   │       ├���─ supabase.service.ts
+│   │   │       ├── receipt-processor.service.ts
+│   │   │       ├── receipt.service.ts
+│   │   │       └── inventory.service.ts
+│   │   │
+│   │   ├── environments/              ← Environment configurations 🔧
+│   │   │   ├── environment.template.ts  ← Template file
+│   │   │   └── environment.ts         ← Your actual config (create this!)
+│   │   │
+│   │   ├── index.html                 ← HTML entry point
+│   │   ├── main.ts                    ← TypeScript entry point
+│   │   └── styles.scss                ← Global styles
+│   │
+│   ├── .gemini/
+│   │   └── GEMINI.md                  ← Gemini AI instructions
+│   │
+│   ├── package.json                   ← BIW dependencies
+│   ├── package-lock.json
+│   ├── angular.json                   ← Angular configuration
+│   ├── tsconfig.json                  ← TypeScript configuration
+│   ├── vitest.config.ts               ← Test configuration
+│   └── README.md                      ← BIW specific README
+│
+├── supabase/                          ← Supabase Backend 🗄️
+│   ├── functions/                     ← Edge Functions (Deno)
+│   │   ├── ocr/
+│   │   │   ├── index.ts               ← OCR function
+│   │   │   └── deno.json
+│   │   ├── parse-receipt/
+│   │   │   ├── index.ts
+│   │   │   └── deno.json
+│   │   ├── classify-items/
+│   │   │   ├── index.ts
+│   │   │   └── deno.json
+│   │   ├── meal-recommendation/
+│   │   │   ├── index.ts
+│   │   │   └── deno.json
+│   │   ├── expiry-alerts/
+│   │   │   ├── index.ts
+│   │   │   └── deno.json
+│   │   ├── get-usage-history/
+│   │   │   ├── index.ts
+│   │   │   └── deno.json
+│   │   └── update-meal-rating/
+│   │       ├── index.ts
+│   │       └── deno.json
+│   │
+│   ├── .temp/                         ← Supabase CLI temp files
+│   │   ├── project-ref                ← Your Supabase project ID
+│   │   ├── pooler-url
+│   │   ├── postgres-version
+│   │   ├── cli-latest
+│   │   └── ...
+│   │
+│   └── config.toml                    ← Supabase configuration
+│
+└──START_GUIDE
+    ├── deploy-supabase.sh             ← Deploy Supabase functions
+    ├── config-helper.sh               ← Environment setup helper
+    ├── quick-deploy.sh                ← One-command deploy
+    └── DEPLOYMENT_GUIDE.md            ← Detailed deployment guide
 
-### 2. Install Dependencies
-```bash
-npm install
+
 ```
-
-### 3. Create Your Environment File
+## 🚀 Quick Start
 ```bash
-cp src/environments/environment.template.ts src/environments/environment.ts
-```
+cd START_GUIDE
 
-### 4. Get API Keys
+###setup your keys and API
+./config-hlper.sh
 
-**A. Firebase Config** - Ask **Suanloh** for the Firebase config (everyone uses the same)
+# Deploy authentication infrastructure
+./quick-deploy.sh
 
-**B. Gemini API Key** - Create your own at https://aistudio.google.com/app/apikey
+cd..
+cd BIW
 
-### 5. Update `src/environments/environment.ts`
-
-```typescript
-export const environment = {
-  production: false,
-  
-  // FIREBASE - Shared by whole team (ask Suanloh for this)
-  firebase: {
-    apiKey: "AIza...",  // From project leader
-    authDomain: "your-project.firebaseapp. com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId:  "1:123:web:abc",
-    measurementId: "G-ABC123"
-  },
-  
-  // GEMINI - Your personal key (create your own!)
-  geminiApiKey: "AIza..."  // Your own key from aistudio.google.com
-};
-```
-
-### 6. Run the App
-```bash
+##start serve
 ng serve
 ```
 
-Open http://localhost:4200/
+## 📦 Prerequisites
 
-### 7. Verify Everything Works
-- 🤖 **Test Gemini AI** → Should respond in 2-5 seconds
-- 🔥 **Test Database** → Should show "Connected!"
-- 📋 **List Available Models** → Shows your available models
+- Flutter 3.22+
+- Supabase CLI
+- Node.js 18+
+- Google AI Studio API Key
+- GitHub account
 
----
-
-## 🔐 Security Rules
-
-### ✅ DO: 
-- Share Firebase config with your team
-- Create your own Gemini API key (free!)
-- Keep `environment.ts` out of Git (it's in `.gitignore`)
-
-### ❌ DON'T: 
-- Commit `environment.ts` to GitHub
-- Share your Gemini key publicly
-- Share Gemini keys in team chat (each person creates their own)
-
----
-
-## 💰 Cost Breakdown
-
-| Service | Cost | Who Pays | Shared? |
-|---------|------|----------|---------|
-| **Firebase** (Firestore, Auth) | Free tier (generous) | Project budget | ✅ Yes - Everyone uses same project |
-| **Gemini API** | Free:  15 req/min<br>Paid: $7/month | Each developer | ❌ No - Each person has own key |
-
----
-
-## 🤝 Team Collaboration
-
-### What's Shared: 
-✅ Firebase project (same database)  
-✅ Code repository  
-✅ Firebase config  
-
-### What's Individual: 
-❌ Gemini API keys (each person creates their own)  
-❌ `environment.ts` file (not in Git)  
-❌ `node_modules` (installed locally)  
-
----
-
-## 📞 Need Help?
-
-- **Firebase access issues** → Ask Suanloh
-- **Gemini API issues** → Check https://aistudio.google.com/app/apikey
-- **Code issues** → Post in team chat
-
-# where di I work?
-```bash
-BIW/
-├── src/
-│   ├── app/
-│   │   ├── components/         👈 FRONTEND works here
-│   │   │   ├── dashboard/
-│   │   │   ├── task-list/
-│   │   │   └── user-profile/
-│   │   │
-│   │   ├── services/           👈 BACKEND logic works here
-│   │   │   ├── gemini. ts       (AI service)
-│   │   │   ├── auth.service.ts (Authentication)
-│   │   │   ├── task.service.ts (Database operations)
-│   │   │   └── user.service.ts (User data)
-│   │   │
-│   │   ├── models/             👈 BACKEND defines data structure
-│   │   │   ├── task.model. ts
-│   │   │   └── user.model.ts
-│   │   │
-│   │   ├── app.ts              👈 FRONTEND (main component)
-│   │   └── app.config.ts       👈 BACKEND (Firebase/API config)
-│   │
-│   └── environments/           👈 BACKEND (API keys, config)
+## 🏗 Architecture
+### Overall Architecture
 ```
+User → Flutter App → Supabase Auth → Database
+      ↓
+  Gemini AI Receipt Scan → Edge Function → Inventory Update
+      ↓
+  Recipe Agent (Gemini) → Suggestions
+```
+
+## 📊 Cost Estimation
+
+### Google Gemini
+**Free tier:** Up to 60 requests/min
+
+**Estimated usage:** Free → $0.10/million request if exceed
+
+
+### Supabase
+- Free tier available
+- DB + Auth + Storage
+- Estimated usage: Free → $25/month
+
+### Total Estimated Monthly Cost:
+$0 – $35 depending on traffic.
+
