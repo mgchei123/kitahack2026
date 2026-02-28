@@ -207,6 +207,50 @@ cd BIW
 ##start serve
 ng serve
 ```
+---
+## Set up for Netlify
+```bash
+# Install Netlify CLI (if not already installed)
+npm install -g netlify-cli
+
+# Login to Netlify
+netlify login
+
+```
+
+### Initialize Netlify site
+```bash
+netlify init
+# Select: Create & configure a new site
+```
+
+### Set environment variables
+```bash
+netlify env:set SUPABASE_URL "https://your-project.supabase.co"
+netlify env:set SUPABASE_ANON_KEY "your-supabase-anon-key"
+netlify env:set GEMINI_API_KEY "your-gemini-api-key"
+
+# List env vars to verify
+netlify env:list
+```
+---
+### Test build locally
+```bash
+cd BIW
+npm install
+npm run build:netlify
+
+# Go back to root
+cd ..
+
+# Deploy to preview (optional)
+netlify deploy
+
+# Deploy to production
+netlify deploy --prod
+```
+
+---
 
 ## 📦 Prerequisites
 
@@ -253,7 +297,7 @@ $0 – $35 depending on traffic.
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 ### Receipt Not Scanning?
 - Ensure high-resolution image
 - Use bright lighting
@@ -280,10 +324,9 @@ $0 – $35 depending on traffic.
 ---
 
 ### Phase 2 — Community Features (Current)
-- [x] **Expiry Alerts** – Automated notifications for aging items.
 - [x] **Inventory Management** – User manually add or change their food inside inventory
+- [x] **Expiry Alerts** – Automated notifications for aging items.
 - [ ] **Waste Badges** – Gamified rewards for sustainable habits.
-- [ ] *Status: In Progress* 🚧
 
 ---
 
@@ -323,5 +366,3 @@ This project is part of the BIW (BeforeItWaste) initiative.
 * Angular Community
 * KITAHack 2026
 ---
-
-
