@@ -127,7 +127,7 @@ kitahack2026/                          ← THIS IS THE PROJECT ROOT! 🎯
 │   │   │   ├── app.routes.ts
 │   │   │   ├── app.spec.ts
 │   │   │   └── services/              ← Angular services
-│   │   │       ├���─ supabase.service.ts
+│   │   │       ├── supabase.service.ts
 │   │   │       ├── receipt-processor.service.ts
 │   │   │       ├── receipt.service.ts
 │   │   │       └── inventory.service.ts
