@@ -71,19 +71,26 @@ export class ReceiptService {
    */
   async saveReceipt(receipt: Omit<Receipt, 'id' | 'user_id' | 'created_at'>): Promise<string> {
     try {
-      const userId = this.supabase.userId;
+      const session = await this.supabase.client.auth.getSession();
+      const userId = session.data.session?.user?.id;
+      
       if (!userId) throw new Error('User not authenticated');
 
       const { data, error } = await this.supabase.client
         .from('receipts')
         .insert([{
-          ...receipt,
-          user_id: userId
+          user_id: userId,
+          image_url: receipt.image_url,
+          processing_status: 'pending',
+          price: 0  // 👈 THIS IS THE MAGIC FIX! Satisfies the Not-Null constraint
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("🚨 Supabase DB Insert Error:", error);
+        throw error;
+      }
 
       console.log('✅ Receipt saved with ID:', data.id);
       return data.id;
