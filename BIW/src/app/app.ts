@@ -395,6 +395,10 @@ export class App implements OnInit {
   // --- REAL Inventory properties ---
   userInventory: any[] = [];
   loadingInventory = false;
+  
+  // Consolidation properties
+  consolidating = false;
+  consolidationStatus = '';
 
   // --- ✨ NEW: USAGE HISTORY & STATS PROPERTIES ✨ ---
   statsLoading = false;
@@ -758,5 +762,13 @@ export class App implements OnInit {
     } catch (error: any) {
       console.error('❌ Error deleting item:', error);
     }
+  }
+
+  // ============================================
+  // UTILITY METHODS
+  // ============================================
+
+  handleImageError(event: any) {
+    event.target.src = 'https://source.unsplash.com/200x150/?food,meal';
   }
 }
