@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "buildCommand": "cd BIW && npm install && npm run build:vercel",
+  "outputDirectory": "BIW/dist/biw/browser",
+  "framework": "angular",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "NODE_VERSION": "18.x"
+  }
+}

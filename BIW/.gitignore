@@ -43,9 +43,9 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
-# Add this line to BIW/.gitignore
-src/environments/environment.ts
-src/environments/environment.prod.ts
+# Environment files - DO NOT COMMIT
+/src/environments/environment.ts
+/src/environments/environment.prod.ts
 
 # Keep the template
 ! src/environments/environment.template.ts
