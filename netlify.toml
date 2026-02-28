@@ -1,0 +1,12 @@
+[build]
+  base = "BIW"
+  command = "npm run build:netlify"
+  publish = "dist/biw/browser"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "18"
