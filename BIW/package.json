@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:vercel": "mkdir -p src/environments && echo \"export const environment = { supabaseUrl: '${SUPABASE_URL}', supabaseKey: '${SUPABASE_KEY}' };\" > src/environments/environment.ts && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
